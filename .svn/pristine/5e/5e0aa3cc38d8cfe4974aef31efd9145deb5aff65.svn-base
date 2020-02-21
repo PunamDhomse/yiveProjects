@@ -1,0 +1,121 @@
+import React from 'react';
+import { Router, Route, Switch, Redirect } from 'react-router-dom';
+import { connect } from 'react-redux';
+import url from '../assets/img/yive_W.png';
+import { history } from '../_helpers';
+import { alertActions, commonActions } from '../_actions';
+import { PrivateRoute } from '../_components';
+import { HomePage } from '../HomePage';
+import { LoginPage } from '../LoginPage';
+import { RegisterPage } from '../RegisterPage';
+import { ForgotPasswordPage } from '../ForgotPasswordPage';
+import { DashboardPage } from '../DashboardPage';
+import { UsersPage } from '../UsersPage';
+import { ProfilePage } from '../ProfilePage';
+import { ChangePasswordPage } from '../ChangePasswordPage';
+import { Sidebar } from '../Sidebar';
+import { Header } from '../Header';
+import { BusinessPage } from '../BusinessPage';
+import { EditUserPage } from '../EditUserPage';
+import { AddUsersPage } from '../AddUsersPage';
+import { AddBusinessPage } from '../AddBusinessPage';
+import { EditBusinessPage } from '../EditBusinessPage';
+import { LocationManagerPage } from '../LocationManagerPage';
+import { AddLocationManagerPage } from '../AddLocationManagerPage';
+import { EditLocationManagerPage } from '../EditLocationManagerPage';
+import { CustomerPage } from '../CustomerPage';
+import { BusinessManager } from '../BusinessManager';
+import { AddBusinessMng } from '../AddBusinessMng';
+import { EditBusinessMngPage } from '../EditBusinessMng';
+import { AddCustomerPage } from '../AddCustomerPage';
+import { EditCustomerPage } from '../EditCustomerPage';
+import { VisitorPage } from '../VisitorPage';
+import { DevicePage } from '../DevicePage';
+import { AddDevicePage } from '../AddDevicePage';
+import { EditDevicePage } from '../EditDevicePage';
+import { AddVisitorPage } from '../AddVisitorPage';
+import { ReportPage } from '../ReportPage';
+import { SelfEnrollPage } from '../SelfEnroll';
+import { RealTimeFeedPage } from '../RealTimeFeedPage';
+import 'react-date-range/dist/styles.css'; // main style file
+import 'react-date-range/dist/theme/default.css'; // theme css file
+
+class App extends React.Component {
+    constructor(props) {
+        super(props);
+
+        history.listen((location, action) => {
+            // clear alert on location change
+            this.props.clearAlerts();
+        });
+    }
+
+    componentWillMount(){
+        this.props.setLogo(url);
+    }
+
+    render() {
+        const { alert } = this.props;
+        return (
+            <div className="jumbotron custombg mb-0 p-0">
+                <div className="container-fluid p-0">
+                    <div className="col-12 p-0">
+                        <Router history={history}>
+                            <Switch>
+                                <PrivateRoute exact path="/" component={LoginPage} />
+                                <Route path="/dashboard" component={DashboardPage} />
+                                <Route path="/users" component={UsersPage} />
+                                <Route path="/profile" component={ProfilePage} />
+                                <Route path="/settings" component={ProfilePage} />
+                                <Route path="/changepassword" component={ChangePasswordPage} />
+                                <Route path="/login" component={LoginPage} />
+                                <Route path="/reports" component={ReportPage} />
+                                <Route path="/register" component={RegisterPage} />
+                                <Route path="/forgotpassword" component={ForgotPasswordPage} />
+                                <Route path="/business" component={BusinessPage} />
+                                <Route path="/header" component={Header} />
+                                <Route path="/Sidebar" component={Sidebar} />
+                                <Route path="/edituser/:user_id" component={EditUserPage} />
+                                <Route path="/adduser" component={AddUsersPage} />
+                                <Route path="/addbusiness" component={AddBusinessPage} />
+                                <Route path="/editbusiness/:business_id" component={EditBusinessPage} />
+
+                                <Route path="/locationMgr/:b_id" component={LocationManagerPage} />
+                                <Route path="/addlocationMgr/:b_id" component={AddLocationManagerPage} />
+                                <Route path="/editlocationMgr/:locationMgr_id/:b_id" component={EditLocationManagerPage} />
+
+                                <Route path="/customer" component={CustomerPage} />
+                                <Route path="/addcustomer" component={AddCustomerPage} />
+                                <Route path="/editcustomer/:customer_id" component={EditCustomerPage} />
+                                <Route path="/visitor/:loc_id/:bus_id" component={VisitorPage} />
+                                <Route path="/addvisitor" component={AddVisitorPage} />
+                                <Route path="/business-manager/:b_id" component={BusinessManager} />
+                                <Route path="/addbusinessmanager/:b_id" component={AddBusinessMng} />
+                                <Route path="/editbusinessmanager/:mgr_id/:b_id" component={EditBusinessMngPage} />
+                                <Route path="/devices" component={DevicePage} />
+                                <Route path="/adddevice" component={AddDevicePage} />
+                                <Route path="/editdevice/:device_id" component={EditDevicePage} />
+                                <Route path="/enroll/:b_id" component={SelfEnrollPage} />
+                                <Route path="/enroll" component={SelfEnrollPage} />
+								<Route path="/realTimeFeed" component={RealTimeFeedPage} />
+                                <Redirect from="*" to="/" />
+                            </Switch>
+                        </Router>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+}
+function mapState(state) {
+    const { alert } = state;
+    return { alert };
+}
+
+const actionCreators = {
+    clearAlerts: alertActions.clear,
+    setLogo: commonActions.setLogo
+};
+
+const connectedApp = connect(mapState, actionCreators)(App);
+export { connectedApp as App };

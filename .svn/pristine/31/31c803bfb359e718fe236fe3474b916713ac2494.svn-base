@@ -1,0 +1,53 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { userActions } from '../_actions';
+import Navbar from 'react-bootstrap/Navbar';
+import Nav from 'react-bootstrap/Nav';
+import NavDropdown from 'react-bootstrap/NavDropdown';
+
+class Header extends React.Component {
+    constructor(props) {
+        super(props);
+    }
+
+    render() {
+      const {user} = this.props;
+        return (
+          <div className="header">
+          <span class="userName text-capitalize">Hello {user.firstname}</span>
+        	 <Navbar collapseOnSelect expand="lg" variant="dark" className="fixed-top">
+            <Navbar.Brand href="#home"></Navbar.Brand>
+            <Navbar.Toggle aria-controls="responsive-navbar-nav" />
+            <Navbar.Collapse id="responsive-navbar-nav">
+              <Nav className="mr-auto">
+              </Nav>
+              <Nav style={{ borderRight: '1px solid white' }}>
+              <Nav.Link className="hide-sm text-capitalize">Hello {user.firstname}</Nav.Link>
+              </Nav>
+            </Navbar.Collapse>
+            <Nav>
+                <NavDropdown title="Account" id="collasible-nav-dropdown">
+                  <NavDropdown.Item href="/profile" ><i className="fa fa-user-o fw"></i> Profile</NavDropdown.Item>
+                  <NavDropdown.Item href="/changepassword"><i className="fa fa-question-circle-o fw"></i> Change Password</NavDropdown.Item>
+                  <NavDropdown.Divider />
+                  <NavDropdown.Item href="/login"><i className="fa fa-sign-out"></i> Logout</NavDropdown.Item>
+                </NavDropdown>
+              </Nav>
+          </Navbar>
+          </div>
+        );
+    }
+}
+
+function mapState(state) {
+    const {user} = state.authentication;
+    return { user };
+}
+
+const actionCreators = {
+    
+}
+
+const connectedHeader = connect(mapState, actionCreators)(Header);
+export { connectedHeader as Header };

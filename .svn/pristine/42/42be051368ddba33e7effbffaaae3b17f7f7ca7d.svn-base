@@ -1,0 +1,330 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { customerActions, visitorActions } from '../_actions';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Header } from '../Header/Header';
+import Table from 'react-bootstrap/Table';
+import { Modal } from 'react-bootstrap';
+import { OverlayTrigger, Popover } from 'react-bootstrap';
+import Button from 'react-bootstrap/Button';
+import DataTable from 'react-data-table-component';
+import { AddCustomerPage } from '../AddCustomerPage';
+
+
+class CustomerPage extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      searchText: '',
+      debounce: null,
+      customers: [],
+      main: [],
+      locs: [],
+      modal: false,
+      memberModal: false,
+      customer: null,
+      deleted: false
+    }
+  }
+  
+  componentDidMount() {
+    const { user } = this.props.authentication;
+    const authUser = user;
+    if (authUser && authUser.role == 'businessOwner') {
+      this.props.getAllCustomers('business_owner_id', authUser._id, { search: this.state.searchText }).then(customers => {
+        this.setState({ customers: customers.data, main: customers.data })
+      });
+    } else if (authUser && authUser.role == 'locationManager') {
+      this.props.getAllCustomers('location_id', authUser.userprofileData.location_id, { search: this.state.searchText, business_id: authUser.userprofileData.business_id }).then(customers => {
+        this.setState({ customers: customers.data, main: customers.data })
+      });
+    } else if (authUser && authUser.role == 'businessManager') {
+      this.props.getAllCustomers('business_owner_id', authUser.userprofileData.business_owner_id, { search: this.state.searchText }).then(customers => {
+        this.setState({ customers: customers.data, main: customers.data })
+      });
+    } else {
+      this.props.getAllCustomers('all', '', { search: this.state.searchText }).then(customers => {
+        this.setState({ customers: customers.data, main: customers.data })
+      });
+    }
+  }
+
+  searchText = (text) => {
+    let { searchText, debounce } = this.state;
+    searchText = text;
+    // if (debounce !== null) {
+    //   clearTimeout(debounce);
+    // }
+    // debounce = setTimeout(() => this.componentDidMount(), 1500);
+    let customers = this.state.main.filter(item => item.firstname && item.lastname && (item.firstname.toLowerCase() + ' ' + item.lastname.toLowerCase()).includes(text.toLowerCase()));
+    this.setState({ searchText, debounce, customers });
+  }
+
+
+  handleEditCustomer(e, id) {
+    e.preventDefault();
+    this.props.editCustomer(id);
+  }
+
+  handleDeleteCustomer(e, id) {
+    e.preventDefault();
+    this.props.deleteCustomer(id);
+  }
+
+  handleActivateCustomer(e, id) {
+    e.preventDefault();
+    const customer = {};
+    customer._id = id;
+    customer.status = true;
+    this.props.activateCustomer(customer);
+  }
+
+  // addVisitor(customer) {
+  //   let obj = {};
+  //   let userProfileData = Array.isArray(customer.userprofileData) ? customer.userprofileData[0] : customer.userprofileData;
+  //   obj['business_id'] = userProfileData.business_id;
+  //   obj['location_id'] = userProfileData.location_id;
+  //   obj['customer_id'] = userProfileData.user_id;
+  //   obj['type'] = 'Manual';
+  //   obj['business_owner_id'] = userProfileData.business_owner_id;
+  //   this.props.addNewVisitor(obj).then(() => {
+  //     const { user } = this.props.authentication;
+  //     const authUser = user;
+  //     if (authUser && authUser.role == 'businessOwner') {
+  //       this.props.getAllCustomers('business_owner_id', authUser._id);
+  //     } else if (authUser && authUser.role == 'businessManager') {
+  //       this.props.getAllCustomers('business_owner_id', authUser.userprofileData.business_owner_id);
+  //     } else {
+  //       this.props.getAllCustomers('all');
+  //     }
+  //   });
+  // }
+
+  // closeModal = (location) => {
+  //   let customer = this.state.customer;
+  //   let userProfileData = Array.isArray(customer.userprofileData) ? customer.userprofileData[0] : customer.userprofileData;
+  //   userProfileData['location_id'] = location;
+  //   customer['userprofileData'] = userProfileData;
+  //   this.addVisitor(customer);
+  //   this.setState({ modal: false });
+  // }
+
+  // checkForVisitor(customer) {
+  //   let userProfileData = Array.isArray(customer.userprofileData) ? customer.userprofileData[0] : customer.userprofileData;
+  //   // let index = customer.visitorData.findIndex(d => d.location_id == userProfileData.location_id);
+  //   if (userProfileData.business_id !== null && (userProfileData.location_id || userProfileData.location_id == null)) {
+  //     return false;
+  //   }
+  //   return true;
+  // }
+
+  // getLocs = (customer) => {
+  //   const { user } = this.props.authentication;
+  //   const authUser = user;
+  //   if (authUser && authUser.role == 'locationManager') {
+  //     let userProfileData = Array.isArray(customer.userprofileData) ? customer.userprofileData[0] : customer.userprofileData;
+  //     userProfileData['location_id'] = authUser.userprofileData.location_id;
+  //     customer['userprofileData'] = userProfileData;
+  //     return this.addVisitor(customer);
+  //   }
+  //   this.setState({ locs: [], customer: customer });
+  //   let ids = customer.userprofileData.business_id;
+  //   if (customer.userprofileData.location_id == null) {
+  //     this.props.getMultipleLocs(ids, 'business_id').then(data => {
+  //       this.setState({ locs: data, modal: true })
+  //     });
+  //     return;
+  //   }
+  //   this.props.getMultipleLocs(customer.userprofileData.location_id, '_id').then(data => {
+  //     this.setState({ locs: data, modal: true })
+  //   });
+  // }
+
+  // getAddVisitor(customer) {
+  //   if (!this.checkForVisitor(customer)) {
+  //     return <input type="button" className="btn btn-success btn-sm" value="Check In" onClick={() => this.getLocs(customer)} />
+  //   } else {
+  //     return <input style={{ background: 'gray' }} type="button" disabled className="btn btn-sm" value="Check In" />
+  //   }
+  // }
+
+  getActions(status, customer_id) {
+    return <div>
+      {status ?
+        <Link to="/" className="" onClick={e => this.handleDeleteCustomer(e, customer_id)} ><i className="fa fa-check fa-fw"></i></Link>
+        :
+        <Link to="/" className="" onClick={e => this.handleActivateCustomer(e, customer_id)} ><i className="fa fa-remove fa-fw"></i></Link>
+      } </div>
+  }
+
+  getActionToName(name,customer_id){
+    return <div> <Link to={{ pathname: `editcustomer/${customer_id}` }} className="">{name}</Link></div>
+  }
+
+  render() {
+    const { customer, alert } = this.props;
+    //console.log("customer ", customer);
+    const columns = [
+      {
+        name: '#',
+        selector: 'sno',
+        sortable: true,
+        grow: 0,
+      },
+      {
+        name: 'Name',
+        selector: 'name',
+        sortable: true,
+        grow: 1
+      },
+      {
+        name: 'Email',
+        selector: 'email',
+        sortable: true
+      },
+      {
+        name: 'Business',
+        selector: 'business',
+        sortable: true,
+        grow: 1
+      },
+      {
+        name: 'Status',
+        selector: 'status',
+        sortable: true,
+        right: true,
+
+      },
+      // {
+      //   name: 'Visitor',
+      //   selector: 'addvisitor',
+      //   center: true,
+      // },
+      {
+        name: 'Actions',
+        selector: 'actions',
+        right: true,
+      }
+    ];
+    let tableData = [];
+    this.state.customers.forEach((customer, index) => {
+      // if(customer.userprofileData.length > 0){
+      let business = Array.isArray(customer.business) ? customer.business[0] : customer.business;
+      const data = {
+        sno: tableData.length + 1,
+        business: business && business.business_name ? business.business_name : 'Un-assigned',
+        name: this.getActionToName(customer.firstname ? customer.firstname + " " + customer.lastname : '', customer._id),
+        email: customer.email ? customer.email : '',
+        status: customer.status ? 'Active' : 'Inactive',
+        // addvisitor: this.getAddVisitor(customer),
+        actions: this.getActions(customer.status, customer._id)
+      }
+      if (this.state.deleted !== customer.status) {
+        tableData.push(data);
+      }
+      //}
+    });
+
+    return (
+      <div>
+        <Sidebar {...this.props} />
+        <div className="wrapper">
+          <Header />
+          <Modal onHide={() => this.setState({ memberModal: false })}
+            show={this.state.memberModal}
+            size="lg"
+            aria-labelledby="contained-modal-title-vcenter"
+            centered
+            id="newMember"
+          >
+            <Modal.Header closeButton>
+              <Modal.Title id="contained-modal-title-vcenter">
+                Add New Member
+
+              </Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <AddCustomerPage {...this.props} closeModal={() => this.setState({ memberModal: false })} />
+            </Modal.Body>
+          </Modal>
+          <div className="users">
+            <div className="container-fluid">
+              <div className="row">
+                {alert.message &&
+                  <div className="col-12 mt-3"><div className={`alert ${alert.type}`}>{alert.message}</div></div>
+                }
+              </div>
+              <div className="row">
+                <div className="col-sm-4 col-12">
+                  <h3>Members</h3>
+                </div>
+                <div className="col-sm-3 col-6 d-flex justify-content-start justify-content-sm-end align-items-center mt-1 mt-sm-0">
+                  {/* <Link to="/addcustomer" className="btn btn-primary w-100z editBtn text-white font-weight-normal">Add New Member</Link> */}
+                  <button onClick={() => this.setState({ memberModal: true })} className="btn btn-outline-secondary w-100z editBtn text-dark font-weight-normal">Add New Member</button>
+                </div>
+                <div className="col-sm-3 col-12 d-flex justify-content-end align-items-center">
+                  <input type='text' placeholder="Search for a Member" className={'form-control'} onChange={(e) => this.searchText(e.target.value)} />
+                </div>
+                <div className="col-sm-2 col-6 d-flex justify-content-start justify-content-sm-end align-items-center mt-1 mt-sm-0">
+                  <select className="form-control" value={this.state.deleted} onChange={(e) => this.setState({ deleted: !this.state.deleted })}>
+                    <option value={false}>Active</option>
+                    <option value={true}>Inactive</option>
+                  </select>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-12">
+                  <Modal show={this.state.modal}>
+                    <Modal.Header closeButton>
+                      <Modal.Title>Select Location</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                      {this.state.locs.map(data => {
+                        return (
+                          <li onClick={() => { this.closeModal(data._id) }} className='pointer list-group-item list-group-item-action'>{data.name}</li>
+                        )
+                      })}
+                    </Modal.Body>
+                    <Modal.Footer>
+                      <Button variant="secondary" onClick={() => this.setState({ modal: false })}>
+                        Close
+                             </Button>
+                    </Modal.Footer>
+                  </Modal> 
+                  <div className="content my-3 shadow bg-white table-responsive dataTables">
+                    <DataTable className="table table-stripped table-bordered"
+                      title=""
+                      columns={columns}
+                      data={tableData}
+                      pagination
+                      sortable
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function mapState(state) {
+  const { customer, alert, authentication } = state;
+  console.log("THIS IS STATE", state);
+  return { customer, alert, authentication };
+}
+
+const actionCreators = {
+  getAllCustomers: customerActions.getAllCustomers,
+  editCustomer: customerActions.editCustomer,
+  deleteCustomer: customerActions.deleteCustomer,
+  activateCustomer: customerActions.activate,
+  addNewVisitor: visitorActions.addNewVisitor,
+  getMultipleLocs: customerActions.getMultipleLocs
+}
+
+const connectedCustomerPage = connect(mapState, actionCreators)(CustomerPage);
+export { connectedCustomerPage as CustomerPage };

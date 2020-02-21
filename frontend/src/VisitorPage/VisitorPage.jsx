@@ -1,0 +1,146 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { visitorActions } from '../_actions';
+import moment from 'moment';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Header } from '../Header/Header';
+import queryString from 'query-string';
+import DataTable from 'react-data-table-component';
+
+class VisitorPage extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      visitors: []
+    }
+  }
+
+  componentWillMount() {
+    let obj = this.props.match.params;
+    if (this.props.location.search) {
+      let params = queryString.parse(this.props.location.search)
+      if (params.start && params.end) {
+        obj['start'] = moment.unix(params.start).toDate();
+        obj['end'] = moment.unix(params.end).toDate();
+      }
+    }
+    this.props.getVisitors(obj).then(data => {
+      this.setState({ visitors: data.data });
+    });
+  }
+
+  render() {
+    const { alert, loading, authentication } = this.props;
+    const { user } = authentication;
+    const authUser = user;
+    const columns = [
+      {
+        name: '#',
+        selector: 'sno',
+        sortable: true,
+        grow: 0,
+      },
+      {
+        name: 'Name',
+        selector: 'customer',
+        sortable: true
+
+      },
+      {
+        name: 'Email',
+        selector: 'email',
+        sortable: true
+
+      },
+      {
+        name: 'Business',
+        selector: 'business',
+        sortable: true,
+        grow: 1
+      },
+      {
+        name: 'Location',
+        selector: 'location',
+        sortable: true
+      },
+      {
+        name: 'Type',
+        selector: 'type'
+      },
+      {
+        name: 'Date',
+        selector: 'visitdate',
+        sortable: true,
+        right: true,
+
+      }
+    ];
+    let tableData = {};
+    tableData = this.state.visitors.map((visitor, index) => {
+      const data = {
+        sno: index + 1,
+        business: visitor.BusinessInfo[0].business_name,
+        location: visitor.locationInfo[0].name,
+        customer: visitor.customerInfo[0] ? visitor.customerInfo[0].firstname + ' ' + visitor.customerInfo[0].lastname : '',
+        email: visitor.customerInfo[0].email,
+        type: visitor.type ? visitor.type : 'Manual',
+        visitdate: new Date(visitor.create_date).toLocaleDateString("en-US")
+      }
+      return data;
+    });
+    return (
+      <div>
+        <Sidebar  {...this.props} />
+        <div className="wrapper">
+          <Header />
+          <div className="users">
+            <div className="container-fluid">
+              <div className="row">
+                {alert.message &&
+                  <div className="col-12"><div className={`alert ${alert.type}`}>{alert.message}</div></div>
+                }
+              </div>
+              <div className="row">
+                <div className="col-6">
+                  <h3>Visitors</h3>
+                </div>
+                {/* {authUser && authUser.role !== 'locationManager' ? <div className="col-6 d-flex justify-content-end align-items-center">
+                  <Link to="/reports" className=""><i class="fa fa-arrow-circle-left fa-fw"></i></Link>
+                </div> : null} */}
+              </div>
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="content my-3 shadow bg-white table-responsive dataTables">
+                    <DataTable className="table table-stripped table-bordered"
+                      title=""
+                      columns={columns}
+                      data={tableData}
+                      pagination
+                      paginationPerPage={25}
+                      paginationRowsPerPageOptions={[25,50,100]}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function mapState(state) {
+  const { visitor, alert, loading, authentication } = state;
+  return { visitor, alert, loading, authentication };
+}
+
+const actionCreators = {
+  getVisitors: visitorActions.getVisitorsForLocation,
+  deleteVisitor: visitorActions.deleteVisitor,
+
+}
+
+const connectedVisitorsPage = connect(mapState, actionCreators)(VisitorPage);
+export { connectedVisitorsPage as VisitorPage };

@@ -1,0 +1,656 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import config from 'config';
+import { businessActions, userActions, customerActions, commonActions, visitorActions } from '../_actions';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Modal, Tabs, Tab } from 'react-bootstrap';
+import Webcam from "react-webcam";
+import { Header } from '../Header/Header';
+import Form from 'react-bootstrap/Form';
+import Button from 'react-bootstrap/Button';
+import moment from 'moment';
+import Image from 'react-bootstrap/Image';
+import NumberFormat from 'react-number-format';
+import DataTable from 'react-data-table-component';
+import { MemberPhoto } from '../MemberPhoto/memberPhoto';
+import { DOBpicker } from '../dobPicker';
+
+var _ = require('lodash');
+
+class EditCustomerPage extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      customer: {
+        firstname: '',
+        business_id: '',
+        location_id: '',
+        lastname: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        country: '',
+        dob: '',
+        gender: '',
+        facebook: '',
+        linkedin: '',
+        twitter: ''
+      },
+      locs: [],
+      submitted: false,
+      noCameraPermission: false,
+      invalid: false,
+      mail: true,
+      modal : false,
+      checkInModal: false,
+      webcamRef: null,
+      activities: []
+    }
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
+
+
+  componentDidMount() {
+    const customerId = this.props.match.params.customer_id;
+    //console.log("customerId" , customerId);
+    this.props.getCustomerById(customerId).then(user => {
+      let customer = {
+        firstname: user.data.firstname,
+        business_id: user.data.userprofileData[0].business_id,
+        location_id: (!user.data.userprofileData[0].location_id && user.data.userprofileData[0].location_id !== null) ? '' : user.data.userprofileData[0].location_id,
+        lastname: user.data.lastname,
+        email: user.data.email,
+        phone: user.data.userprofileData[0].phone,
+        address: user.data.userprofileData[0].address ? user.data.userprofileData[0].address : '',
+        city: user.data.userprofileData[0].city ? user.data.userprofileData[0].city : '',
+        state: user.data.userprofileData[0].state ? user.data.userprofileData[0].state : '',
+        country: user.data.userprofileData[0].country ? user.data.userprofileData[0].country : '',
+        dob: user.data.userprofileData[0].dob ? user.data.userprofileData[0].dob : '',
+        gender: user.data.userprofileData[0].gender ? user.data.userprofileData[0].gender : '',
+        facebook: user.data.userprofileData[0].facebook ? user.data.userprofileData[0].facebook : '',
+        linkedin: user.data.userprofileData[0].linkedin ? user.data.userprofileData[0].linkedin : '',
+        twitter: user.data.userprofileData[0].twitter ? user.data.userprofileData[0].twitter : ''
+      }
+      this.setState({ customer });
+      this.props.regionsList(customer.country);
+      this.props.getVisitorByCustId(this.props.match.params.customer_id).then(res => {
+        this.setState({ activities: res.data });
+      })
+    });
+    const { user } = this.props.authentication;
+    //const {userprofileData} = this.state.customer.customerprofile;
+    // console.log("LOCATION OF USER", userprofileData[0]['location_id'] );
+    const authUser = user;
+    if (authUser && authUser.role == 'businessOwner') {
+      console.log("Get all bussiness by user ID");
+      this.props.getBusiness(authUser._id);
+    } else if (authUser && authUser.role == 'businessManager') {
+      this.props.getBusiness(authUser.userprofileData.business_owner_id);
+    } else {
+      console.log("Get all bussiness by ADMIN");
+      this.props.getBusiness();
+    }
+    this.props.countriesList();
+  }
+
+  ValidateEmail = (mail) => {
+    if (/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(mail)) {
+      return (true)
+    }
+    return (false)
+  }
+
+  handleChange(event) {
+    const { name, value } = event.target;
+    const { customer } = this.state;
+    if (name == 'country') {
+      this.props.regionsList(value);
+    }
+    if (name == 'business_id') {
+      this.props.getBusinessLocations(value);
+    }
+    if (name == 'email') {
+      this.ValidateEmail(value) ? this.setState({ mail: true }) : this.setState({ mail: false });
+    }
+    this.setState({
+      customer: {
+        ...customer,
+        [name]: value
+      }
+    });
+  }
+
+  checkCustomer = () => {
+    let result = true;
+    let customer = this.state.customer;
+    const { user } = this.props.authentication;
+    Object.keys(customer).forEach(function (key) {
+      // let status = ["facebook", "linkedin", "twitter"].includes(key);
+      // if (user && user.role !== 'businessOwner') {
+      //   status = ["facebook", "linkedin", "twitter", "business_id", "location_id"].includes(key);
+      // }
+      if (customer['firstname'] == '' || customer['lastname'] == '') {
+        result = false;
+      }
+    });
+    return result;
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    this.setState({ submitted: true, invalid: false });
+    const { customer } = this.state;
+    const customerId = this.props.match.params.customer_id;
+    let userId = customerId;
+    //console.log('submitting stateUser', stateUser);
+    if (this.checkCustomer() && this.state.mail) {
+      customer._id = userId;
+      customer.user_id = userId;
+      if (customer.country == "") { customer.country = null }
+      if (customer.state == "") { customer.state = null }
+      if (customer.location_id == 'all' || customer.location_id == null) {
+        customer['location_id'] = null;
+      }
+      if (customer.location_id == '') {
+        delete customer.location_id;
+      }
+      this.props.updateCustomerById(customer);
+    }
+    else {
+      this.setState({ invalid: true });
+    }
+  }
+
+  uploadPic = (e) => {
+    if (e.target.files.length > 0) {
+      let file = e.target.files[0];
+      let formData = new FormData();
+      formData.append('file', file);
+      this.props.updateProfilePic(this.props.match.params.customer_id, formData);
+    }
+  }
+
+
+  setRef = (ref) => {
+    this.setState({ webcamRef: ref });
+  }
+
+  capture = (props) => {
+    const imageSrc = this.state.webcamRef.getScreenshot();
+    fetch(imageSrc)
+      .then(function (res) { return res.arrayBuffer(); })
+      .then(function (buf) {
+        let file = new File([buf], `${props.customerprofile.firstname}.jpeg`, { type: 'image/jpeg' });
+        let formData = new FormData();
+        formData.append('file', file);
+        const { customerprofile } = props;
+        props.updateProfilePic(customerprofile._id, formData);
+      })
+    this.setState({ modal: false });
+  };
+
+  getValue = (customer) => {
+    if (customer.location_id == null) {
+      return 'all';
+    } else if (customer.location_id && customer.location_id !== null) {
+      return customer.location_id;
+    } else {
+      return null;
+    }
+  }
+
+  getLocs = (customer) => {
+    debugger
+    const { user } = this.props.authentication;
+    const authUser = user;
+    if (authUser && authUser.role == 'locationManager') {
+      let userProfileData = Array.isArray(customer) ? customer[0] : customer;
+      userProfileData['location_id'] = authUser.location_id;
+      customer = userProfileData;
+      return this.addVisitor(customer);
+    }
+    this.setState({ locs: [], customer: customer });
+    let ids = customer.business_id;
+    if (customer.location_id == null) {
+      this.props.getMultipleLocs(ids, 'business_id').then(data => {
+        this.setState({ locs: data, modal: true })
+      });
+      return;
+    }
+    this.props.getMultipleLocs(customer.location_id, '_id').then(data => {
+      this.setState({ locs: data, modal: true })
+    });
+  }
+
+
+  addVisitor(customer) {
+    debugger
+    let obj = {};
+    let userProfileData = Array.isArray(customer) ? customer[0] : customer;
+    obj['business_id'] = userProfileData.business_id;
+    obj['location_id'] = userProfileData.location_id;
+    obj['customer_id'] = userProfileData.user_id;
+    obj['type'] = 'Manual';
+    obj['business_owner_id'] = userProfileData.business_owner_id;
+    this.props.addNewVisitor(obj).then(() => {
+      const { user } = this.props.authentication;
+      const authUser = user;
+      if (authUser && authUser.role == 'businessOwner') {
+        this.props.getAllCustomers('business_owner_id', authUser._id);
+      } else if (authUser && authUser.role == 'businessManager') {
+        this.props.getAllCustomers('business_owner_id', authUser.business_owner_id);
+      } else {
+        this.props.getAllCustomers('all');
+      }
+    });
+  }
+
+  closeModal = (location) => {
+    debugger;
+    let customer = this.state.customer;
+    let userProfileData = Array.isArray(customer) ? customer[0] : customer;
+    userProfileData['location_id'] = location;
+    customer = userProfileData;
+    this.addVisitor(customer);
+    this.setState({ modal: false });
+  }
+
+  checkForVisitor(customer) {
+    debugger
+    let userProfileData = Array.isArray(customer) ? customer[0] : customer;
+    // let index = customer.visitorData.findIndex(d => d.location_id == userProfileData.location_id);
+    if (userProfileData.business_id !== null && (userProfileData.location_id || userProfileData.location_id == null)) {
+      return false;
+    }
+    return true;
+  }
+
+  getAddVisitor(customer) {
+    debugger
+    if (!this.checkForVisitor(customer)) {
+      console.log("if value is true")
+      return true;
+    } else {
+      console.log("if value is false")
+      return false;
+    }
+  }
+
+  render() {
+    const { alert, business, updating, customerprofile, countries, regions, userprofile } = this.props;
+    const { user } = this.props.authentication;
+    const { userprofileData } = customerprofile ? customerprofile : {};
+    const { customer, errorMessage } = this.state
+    const activityColumns = [
+      {
+        name: '#',
+        selector: 'sno',
+        sortable: true,
+        grow: 0,
+      },
+      {
+        name: 'Business',
+        selector: 'business',
+        sortable: true,
+        grow: 1
+      },
+      {
+        name: 'Location',
+        selector: 'location',
+        sortable: true
+      },
+      {
+        name: 'Type',
+        selector: 'type',
+        sortable: true
+      },
+      {
+        name: 'Date',
+        selector: 'date',
+        sortable: true,
+        right: true,
+
+      }
+    ];
+
+    let activityData = this.state.activities.map((elem, index) => {
+      return {
+        sno: index + 1,
+        business: elem.BusinessInfo.business_name,
+        location: elem.locationInfo.name,
+        type: elem.status ? 'Active' : 'In Active',
+        date: moment(elem.create_date).format('MM/DD/YYYY')
+      }
+    });
+
+    const data = {
+      addVisitors: this.getAddVisitor(customer)
+    }
+
+    return (
+      <div>
+        <Sidebar {...this.props} />
+        <div className="wrapper">
+          <Header />
+          {errorMessage &&
+            <div className={`alert alert-danger`}>{errorMessage}</div>
+          }
+          {alert.message &&
+            <div className={`alert ${alert.type}`}>{alert.message}</div>
+          }
+          <div className="row mt-5">
+            <div className="container-fluid">
+              <div className="row mb-3">
+                <div className="col-6 pl-0 pr-0">
+                  <h3>Member Details</h3>
+                </div>
+                <div className="col-6 d-flex justify-content-end align-items-center">
+                  <Link to="/customer" className=""><i className="fa fa-arrow-circle-left fa-fw"></i></Link>
+                </div>
+              </div>
+              <Form onSubmit={this.handleSubmit}>
+                {/* <div className="row"> 
+                  <div className="col-12">
+                    <div className="card shadow">
+                      <div className="card-body">
+                        <h3>Business</h3>
+                        <div className="row">
+                          <div className="col-md-6 col-sm-6 col-12">
+                            <Form.Group controlId="exampleForm.ControlSelect1">
+                              <Form.Label>Business {user && user.role === 'admin' ? null : <span className="text-danger">*</span>}</Form.Label>
+                              <Form.Control name="business_id" as="select" value={customer.business_id} onChange={this.handleChange}>
+                                <option >Select business</option>
+                                {Array.isArray(business.items) ?
+                                  business.items.map((business, index) =>
+                                    <option value={business._id}>{business.business_name}</option>
+                                  ) : null};
+                                              </Form.Control>
+                            </Form.Group>
+                          </div>
+                          <div className="col-md-6 col-sm-6 col-12">
+                            <Form.Group controlId="exampleForm.ControlSelect1">
+                              <Form.Label>Location {user && user.role === 'admin' ? null : <span className="text-danger">*</span>}</Form.Label>
+                              <Form.Control name="location_id" as="select" value={this.getValue(customer)} onChange={this.handleChange}>
+                                <option >Select Location</option>
+                                <option value="all">All Locations</option>
+                                {Array.isArray(business.businessLocation) ?
+                                  business.businessLocation.map((location, index) =>
+                                    <option value={location._id}>{location.name}</option>
+                                  ) : null};
+                                              </Form.Control>
+                            </Form.Group>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                </div> */}
+                <div className="row my-3">
+                  <div className="col-md-12 pl-0 pr-0">
+                    <div className="row">
+                      <div className="col-md-3 pl-0 pr-0">
+                        <div className="card card-user shadow">
+                          {/* <div className="image"></div> */}
+                          <div className="card-body">
+                            <div className="author mt-0">
+                              <h5 className="">{customerprofile ? customerprofile.firstname : ''} {customerprofile ? customerprofile.lastname : ''}</h5>
+                              <a>
+                                <Image style={{ width: '8em', height: '8em', objectFit: 'cover' }} src={customerprofile && customerprofile.userprofileData.length > 0 && customerprofile.userprofileData[0].photo ? config.apiUrl.substring(0, config.apiUrl.length - 3) + customerprofile.userprofileData[0].photo : `https://www.w3schools.com/howto/img_avatar.png`} roundedCircle />
+                                <input id="userImage" type="file" onChange={(e) => this.uploadPic(e)} name="myImage" accept="image/*" hidden />
+                              </a>
+                              <div className="row mt-4 border-bottom">
+                                <div className='col-12'>
+                                  <p className="description">
+                                    {customerprofile ? customerprofile.email : ''}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="row mt-3 border-bottom">
+                                <div className='col-12'>
+                                  <p className="description">
+                                    {customerprofile && customerprofile.userprofileData && customerprofile.userprofileData.length > 0 ? customerprofile.userprofileData[0].phone : ''}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="row mt-3 border-bottom">
+                                <div className='col-12'>
+                                  <p className="description">
+                                    {customerprofile && customerprofile.userprofileData && customerprofile.userprofileData.length > 0 ? customerprofile.userprofileData[0].dob : ''}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="row">
+                              <div className="col-12 text-center mt-2">
+                                <Button onClick={() => document.getElementById('userImage').click()} variant="primary" className="btn-sm w-100">
+                                  Upload Image
+                                    </Button>
+                              </div>
+                              <div className="col-12 text-center mt-2">
+                                <Button onClick={() => this.setState({ modal: true })} variant="primary" className="btn-sm w-100">
+                                  Enroll Face
+                                    </Button>
+                              </div>
+                              <div className="col-12 text-center mt-2">
+                                {
+                                  (this.getAddVisitor(customer)) ? (
+                                    <input type="button" className="btn btn-success btn-sm w-100" value="Check In" onClick={() => this.getLocs(customer)} />
+                                  ) : (
+                                      <input style={{ background: 'gray' }} type="button" disabled className="btn btn-sm w-100" value="Check In" />
+                                    )
+                                }
+                              </div>
+                            </div>
+                            <Modal show={this.state.modal}>
+                              <Modal.Body>
+                                {this.state.noCameraPermission ? <div className="text-center">
+                                  No permissions to access camera
+                              </div> : null}
+                                <Webcam
+                                  height={'100%'}
+                                  width={'100%'}
+                                  ref={this.setRef}
+                                  screenshotFormat="image/jpeg"
+                                  onUserMedia={() => this.setState({ noCameraPermission: false })}
+                                  onUserMediaError={() => this.setState({ noCameraPermission: true })}
+                                />
+                              </Modal.Body>
+                              <Modal.Footer>
+                                <Button variant="secondary" onClick={() => this.setState({ modal: false, noCameraPermission: false })}>
+                                  Close
+                             </Button>
+                                <Button disabled={this.state.noCameraPermission} variant="primary" onClick={() => this.capture(this.props)}>
+                                  Take Photo
+                               </Button>
+                              </Modal.Footer>
+                            </Modal>
+                            <Modal show={this.state.checkInModal}>
+                              <Modal.Header closeButton>
+                                <Modal.Title>Select Location</Modal.Title>
+                              </Modal.Header>
+                              <Modal.Body>
+                                {this.state.locs.map(data => {
+                                  return (
+                                    <li onClick={() => { this.closeModal(data._id) }} className='pointer list-group-item list-group-item-action'>{data.name}</li>
+                                  )
+                                })}
+                              </Modal.Body>
+                              <Modal.Footer>
+                                <Button variant="secondary" onClick={() => this.setState({ checkInModal: false })}>
+                                  Close
+                             </Button>
+                              </Modal.Footer>
+                            </Modal>
+
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-md-9 pr-0 pl-0">
+                        <Tabs defaultActiveKey="home" id="uncontrolled-tab-example">
+                          <Tab eventKey="home" title="Profile Info">
+                            <div className="card">
+                              {/* <div className="card-header">
+                                <h5 className="">Member Details</h5>
+                              </div> */}
+                              <div className="card-body">
+                                <Form.Group controlId="formBasicEmail">
+                                  <Form.Label>First Name <span className="text-danger">*</span></Form.Label>
+                                  <Form.Control type="text" name="firstname" placeholder="Enter your firstname" value={customer.firstname} onChange={this.handleChange} />
+                                  <Form.Text className="text-muted">
+                                  </Form.Text>
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicEmail">
+                                  <Form.Label>Last Name <span className="text-danger">*</span></Form.Label>
+                                  <Form.Control type="text" name="lastname" placeholder="Enter your lastname" value={customer.lastname} onChange={this.handleChange} />
+                                  <Form.Text className="text-muted">
+                                  </Form.Text>
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>Email</Form.Label>
+                                  <Form.Control type="text" name="email" placeholder="Enter your email" value={customer.email} onChange={this.handleChange} />
+                                  {!this.state.mail ? <span style={{ color: 'red', fontSize: '12px' }}>Please enter a valid email</span> : null}
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>Phone</Form.Label>
+                                  {/* <Form.Control type="text" name="phone" placeholder="Enter your phone" value={customer.phone} onChange={this.handleChange} /> */}
+                                  <NumberFormat value={customer.phone} format="+1 (###) ###-####" mask="_" name="phone" class="form-control" placeholder="Enter your phone" onChange={this.handleChange} />
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>Address</Form.Label>
+                                  <Form.Control as="textarea" rows="2" data-fieldname="address" name="address" placeholder="Enter your address" value={customer.address} onChange={this.handleChange} />
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>Country</Form.Label>
+                                  <Form.Control name="country" as="select" value={customer.country} onChange={this.handleChange}  >
+                                    <option value="0">Select country</option>
+                                    {countries && countries.length &&
+                                      countries.map((country, index) =>
+                                        <option value={country._id}>{country.name}</option>
+                                      )};
+                                            </Form.Control>
+                                </Form.Group>
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>State</Form.Label>
+                                  <Form.Control name="state" as="select" value={customer.state} onChange={this.handleChange}  >
+                                    <option >Select state</option>
+                                    {regions && regions.length &&
+                                      regions.map((region, index) =>
+                                        <option value={region._id}>{region.name}</option>
+                                      )};
+                                      </Form.Control>
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>City</Form.Label>
+                                  <Form.Control type="text" name="city" placeholder="Enter your city" value={customer.city} onChange={this.handleChange} />
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>Date of birth</Form.Label>
+                                  {/* <Form.Control type="text" name="dob" placeholder="Enter your DOB" value={customer.dob} onChange={this.handleChange} /> */}
+                                  <DOBpicker value={customer.dob} change={this.handleChange} />
+                                  {/* <NumberFormat format="##/##/####" name="dob" placeholder="DD/MM/YYYY" id="formBasicPassword" class="form-control" mask={['D', 'D', 'M', 'M', 'Y', 'Y', 'Y', 'Y']} value={customer.dob} onChange={this.handleChange} /> */}
+
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label className="pr-3">Gender</Form.Label>
+                                  <Form.Check inline label="Male" name="gender" type="radio" value="male" checked={customer.gender == 'male'} onChange={this.handleChange} />
+                                  <Form.Check inline label="Female" name="gender" type="radio" value="female" checked={customer.gender == 'female'} onChange={this.handleChange} />
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>Facebook Profile</Form.Label>
+                                  <Form.Control type="text" name="facebook" placeholder="Enter your Fb profile" value={customer.facebook} onChange={this.handleChange} />
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>Linkedin Profile</Form.Label>
+                                  <Form.Control type="text" name="linkedin" placeholder="Enter your Linkedin profile" value={customer.linkedin} onChange={this.handleChange} />
+                                </Form.Group>
+
+                                <Form.Group controlId="formBasicPassword">
+                                  <Form.Label>Twitter Profile</Form.Label>
+                                  <Form.Control type="text" name="twitter" placeholder="Enter your Insta profile" value={customer.twitter} onChange={this.handleChange} />
+                                </Form.Group>
+                                <Button variant="primary" className="customBtn" type="submit">
+                                  Update
+                                    </Button>
+                              </div>
+                              <div className="row">
+                                {this.state.invalid ?
+                                  <div className="col-12"><div className={`alert alert-danger`}>Please fill all fields</div></div> : null
+                                }
+                              </div>
+                            </div>
+                          </Tab>
+                          <Tab eventKey="activity" title="Activity">
+                            <div className="card">
+                              <div className="card-body">
+                                <div className="table-responsive dataTables photos">
+                                  <DataTable className="table table-stripped table-bordered"
+                                    title=""
+                                    columns={activityColumns}
+                                    data={activityData}
+                                    pagination
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </Tab>
+                          <Tab eventKey="photo" title="Photo">
+                            <div className="card">
+                              <MemberPhoto customer={this.state.customer} {...this.props} />
+                            </div>
+                          </Tab>
+                        </Tabs>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              </Form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    );
+  }
+}
+
+function mapState(state) {
+  const { alert, business, authentication, customer } = state;
+  const { customerprofile } = state.customer;
+  const { userprofile } = state.users;
+  const { countries, regions } = state.common;
+  return { alert, customerprofile, business, countries, regions, authentication, userprofile, customer };
+}
+
+const actionCreators = {
+  getCustomerById: customerActions.getCustomerById,
+  getBusiness: businessActions.getAllBusiness,
+  countriesList: commonActions.getCountries,
+  getBusinessLocations: businessActions.getBusinessLocations,
+  regionsList: commonActions.getRegions,
+  updateCustomerById: customerActions.updateCustomerById,
+  updateProfilePic: customerActions.updateProfilePic,
+  getVisitorByCustId: visitorActions.getVisitorByCustId,
+  getMultipleLocs: customerActions.getMultipleLocs,
+  addNewVisitor: visitorActions.addNewVisitor,
+  getAllCustomers: customerActions.getAllCustomers
+}
+
+
+const connectedEditCustomerPage = connect(mapState, actionCreators)(EditCustomerPage);
+export { connectedEditCustomerPage as EditCustomerPage };

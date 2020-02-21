@@ -1,0 +1,709 @@
+import React from 'react';
+import config from 'config'
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { OverlayTrigger, Popover } from 'react-bootstrap';
+import { dashboardActions, businessActions } from '../_actions';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Header } from '../Header/Header';
+import Tabs from 'react-bootstrap/Tabs';
+import Tab from 'react-bootstrap/Tabs';
+import { Bar } from 'react-chartjs-2';
+import { Pie } from 'react-chartjs-2';
+import Image from 'react-bootstrap/Image';
+import { Doughnut } from 'react-chartjs-2';
+// import DateRangePicker from 'react-bootstrap-daterangepicker';
+// import 'bootstrap/dist/css/bootstrap.css';
+// import 'bootstrap-daterangepicker/daterangepicker.css';
+import { DateRangePicker, DateRange } from 'react-date-range';
+
+const endDateVal = new Date();
+const startDateVal = new Date().setMonth(endDateVal.getMonth() - 1);
+const startDateNew = new Date(startDateVal);
+
+class DashboardPage extends React.Component {
+  constructor(props) {
+    super(props);
+    this.dateOpen = this.dateOpen.bind(this);
+    this.formatDateDisplay = this.formatDateDisplay.bind(this);
+    this.handlePreviewChange = this.handlePreviewChange.bind(this);
+  }
+
+  state = {
+    dateClick: 'close',
+    rangeClick: '',
+    // startDate: new Date(),
+    dateRangePicker: {
+      selection: {
+        startDate: startDateNew,
+        endDate: endDateVal,
+        key: 'selection',
+      },
+    },
+    dateRange: {
+      selection: {
+        startDate: startDateNew,
+        endDate: endDateVal,
+        key: 'selection',
+      },
+    },
+
+    business: '',
+
+    visitor_days: [],
+    visitor_chart_data: [],
+    visitor_chart_colors: []
+  };
+
+  componentDidMount() {
+    const { user } = this.props.authentication;
+    const authUser = user;
+    const startDate = startDateNew;
+    const endDate = endDateVal;
+
+    if (authUser && authUser.role == 'businessOwner') {
+      //this.props.getAllBusinessesVisitor(authUser._id);
+    } else {
+      this.props.getAllBusinessesVisitor("", startDate, endDate);
+    }
+  }
+
+  handleChange = date => {
+    /* this.setState({
+       startDate: date
+     });*/
+  };
+
+
+  componentWillMount() {
+    const { user } = this.props.authentication;
+    const authUser = user;
+
+    // visitors over time chart
+    let startDate1 = new Date(startDateNew);
+    let endDate1 = endDateVal;
+    while (startDate1 <= endDate1) {
+      this.state.visitor_days.push((startDate1.getMonth() + 1) + '-' + startDate1.getDate() + '-' + startDate1.getFullYear());
+      startDate1.setDate(startDate1.getDate() + 1);
+
+      this.state.visitor_chart_colors.push("#3a4651");
+
+      this.state.visitor_chart_data.push(0);
+    }
+    this.state.visitor_days = [...this.state.visitor_days];
+    this.state.visitor_chart_data = [...this.state.visitor_chart_data];
+    this.state.visitor_chart_colors = [...this.state.visitor_chart_colors];
+
+
+    let startDate = startDateNew;
+    let endDate = endDateVal;
+    let startDateFilter = (startDate.getMonth() + 1) + '-' + startDate.getDate() + '-' + startDate.getFullYear();
+    let endDateFilter = (endDate.getMonth() + 1) + '-' +  endDate.getDate()+ '-' + endDate.getFullYear();
+
+    if (authUser && authUser.role == 'admin') {
+      this.props.getBusinessCounts(startDateFilter, endDateFilter);
+      this.props.getVisitorCounts(startDateFilter, endDateFilter);
+      this.props.getCustomerCounts(startDateFilter, endDateFilter);
+      this.props.getCustomers(startDateFilter, endDateFilter, 'all');
+      this.props.getVisitors(startDateFilter, endDateFilter, 'all');
+
+    } else if (authUser && authUser.role == 'locationManager') {
+      this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id);
+      this.props.getLocationVisitorCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+      this.props.getLocationCustomerCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+      this.props.getLocationCustomers(startDateFilter, endDateFilter, 'location_id', authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+      this.props.getLocationVisitors(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+      this.props.getBusinessById(authUser.userprofileData.business_id).then(business => {
+          console.log(business);
+          this.setState({'business': business.data.business_name});
+      });
+
+    } else if (authUser && authUser.role == 'businessManager') {
+      this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+      this.props.getVisitorCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+      this.props.getCustomerCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+      this.props.getCustomers(startDateFilter, endDateFilter, 'business_owner_id', authUser.userprofileData.business_owner_id);
+      this.props.getVisitors(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+      this.props.getBusinessById(authUser.userprofileData.business_id).then(business => {
+          console.log(business);
+          this.setState({'business': business.data.business_name});
+      });
+
+    } else {
+      this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser._id);
+      this.props.getVisitorCounts(startDateFilter, endDateFilter, authUser._id);
+      this.props.getCustomerCounts(startDateFilter, endDateFilter, authUser._id);
+      this.props.getCustomers(startDateFilter, endDateFilter, 'business_owner_id', authUser._id);
+      this.props.getVisitors(startDateFilter, endDateFilter, authUser._id);
+      
+      console.log("hello-----------------------------");
+      console.log(this.props.getAllBusiness(authUser._id));
+
+     /* .then(business => {
+          console.log(business);
+          this.setState({'business': business.data.business_name});
+      });*/
+    }
+  }
+
+  handleRangeChange(which, payload) {
+    console.log("payload", payload);
+    this.setState({
+      [which]: {
+        ...this.state[which],
+        ...payload,
+      },
+    });
+
+    if (which == 'dateRangePicker') {
+      if (this.state.dateRangePicker.selection.startDate == this.state.dateRangePicker.selection.endDate || this.state.rangeClick == 'staticRanges' || this.state.rangeClick == 'inputRanges') {
+        this.setState({ dateClick: 'close' });
+
+        let { user } = this.props.authentication;
+        let authUser = user;
+
+        let startDate = payload.selection.startDate;
+        let endDate = payload.selection.endDate;
+        let startDateFilter = (startDate.getMonth() + 1)  + '-' + startDate.getDate() + '-' + startDate.getFullYear();
+        let endDateFilter = (endDate.getMonth() + 1) + '-' + endDate.getDate() + '-' + endDate.getFullYear();
+
+        if (authUser && authUser.role == 'admin') {
+          this.props.getBusinessCounts(startDateFilter, endDateFilter);
+          this.props.getVisitorCounts(startDateFilter, endDateFilter);
+          this.props.getCustomerCounts(startDateFilter, endDateFilter);
+          this.props.getCustomers(startDateFilter, endDateFilter, 'all');
+          this.props.getVisitors(startDateFilter, endDateFilter, 'all');
+
+        } else if (authUser && authUser.role == 'locationManager') {
+          this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id);
+          this.props.getLocationVisitorCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+          this.props.getLocationCustomerCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+          this.props.getLocationCustomers(startDateFilter, endDateFilter, 'location_id', authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+          this.props.getLocationVisitors(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+
+          this.props.getBusinessById(authUser.userprofileData.business_id).then(business => {
+              this.setState({'business': business.data.business_name});
+          });
+
+        } else if(authUser && authUser.role == 'businessManager') {
+          this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+          this.props.getVisitorCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+          this.props.getCustomerCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+          this.props.getCustomers(startDateFilter, endDateFilter, 'business_owner_id', authUser.userprofileData.business_owner_id);
+          this.props.getVisitors(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+          this.props.getBusinessById(authUser.userprofileData.business_id).then(business => {
+            this.setState({'business': business.data.business_name});
+          });
+
+        } else {
+          this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser._id);
+          this.props.getVisitorCounts(startDateFilter, endDateFilter, authUser._id);
+          this.props.getCustomerCounts(startDateFilter, endDateFilter, authUser._id);
+          this.props.getCustomers(startDateFilter, endDateFilter, 'business_owner_id', authUser._id);
+          this.props.getVisitors(startDateFilter, endDateFilter, authUser._id);
+          /*this.props.getAllBusiness(authUser._id).then(business => {
+              console.log("hello-----------------------------");
+              console.log(business);
+              this.setState({'business': business.data[0].business_name});
+          });*/
+
+          console.log("hello-----------------------------");
+          console.log(this.props.getAllBusiness(authUser._id));
+        }
+
+        // visitors over time chart
+        let startDate1 = new Date((startDate.getMonth() + 1) + '-' + startDate.getDate() + '-' + startDate.getFullYear());
+        this.state.visitor_days = [];
+        this.state.visitor_chart_data = [];
+        this.state.visitor_chart_colors = [];
+
+        while (startDate1 <= endDate) {
+          this.state.visitor_days.push((startDate1.getMonth() + 1) + '-' + startDate1.getDate() + '-' + startDate1.getFullYear());
+          startDate1.setDate(startDate1.getDate() + 1);
+
+          this.state.visitor_chart_colors.push("#3a4651");
+
+          this.state.visitor_chart_data.push(0);
+        }
+        this.state.visitor_days = [...this.state.visitor_days];
+        this.state.visitor_chart_data = [...this.state.visitor_chart_data];
+        this.state.visitor_chart_colors = [...this.state.visitor_chart_colors];
+      }
+    } else {
+      if (this.state.dateRange.selection.startDate == this.state.dateRange.selection.endDate) {
+        this.setState({ dateClick: 'close' });
+
+        let { user } = this.props.authentication;
+        let authUser = user;
+
+        let startDate = payload.selection.startDate;
+        let endDate = payload.selection.endDate;
+        let startDateFilter = (startDate.getMonth() + 1) + '-' + startDate.getDate() + '-' + startDate.getFullYear();
+        let endDateFilter = (endDate.getMonth() + 1) + '-' + endDate.getDate() + '-' + endDate.getFullYear();
+
+        if (authUser && authUser.role == 'admin') {
+          this.props.getBusinessCounts(startDateFilter, endDateFilter);
+          this.props.getVisitorCounts(startDateFilter, endDateFilter);
+          this.props.getCustomerCounts(startDateFilter, endDateFilter);
+          this.props.getCustomers(startDateFilter, endDateFilter, 'all');
+          this.props.getVisitors(startDateFilter, endDateFilter, 'all');
+
+        } else if (authUser && authUser.role == 'locationManager') {
+          this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id);
+          this.props.getLocationVisitorCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+          this.props.getLocationCustomerCounts(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+          this.props.getLocationCustomers(startDateFilter, endDateFilter, 'location_id', authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+          this.props.getLocationVisitors(startDateFilter, endDateFilter, authUser.userprofileData.location_id, authUser.userprofileData.business_id);
+          this.props.getBusinessById(authUser.userprofileData.business_id).then(business => {
+              this.setState({'business': business.data.business_name});
+          });
+
+        } else if(authUser && authUser.role == 'businessManager') {
+          this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+          this.props.getVisitorCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+          this.props.getCustomerCounts(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+          this.props.getCustomers(startDateFilter, endDateFilter, 'business_owner_id', authUser.userprofileData.business_owner_id);
+          this.props.getVisitors(startDateFilter, endDateFilter, authUser.userprofileData.business_owner_id);
+          this.props.getBusinessById(authUser.userprofileData.business_id).then(business => {
+              this.setState({'business': business.data.business_name});
+          });
+
+        } else {
+          this.props.getBusinessCounts(startDateFilter, endDateFilter, authUser._id);
+          this.props.getVisitorCounts(startDateFilter, endDateFilter, authUser._id);
+          this.props.getCustomerCounts(startDateFilter, endDateFilter, authUser._id);
+          this.props.getCustomers(startDateFilter, endDateFilter, 'business_owner_id', authUser._id);
+          this.props.getVisitors(startDateFilter, endDateFilter, authUser._id);
+          /*this.props.getAllBusiness(authUser._id).then(business => {
+              console.log(business);
+              this.setState({'business': business.data[0].business_name});
+          });*/
+
+          console.log("hello-----------------------------");
+          console.log(this.props.getAllBusiness(authUser._id));
+        }
+        // visitors over time chart
+        let startDate1 = new Date((startDate.getMonth() + 1) + '-' + startDate.getDate() + '-' + startDate.getFullYear());
+        this.state.visitor_days = [];
+        this.state.visitor_chart_data = [];
+        this.state.visitor_chart_colors = [];
+
+        while (startDate1 <= endDate) {
+          this.state.visitor_days.push((startDate1.getMonth() + 1) + '-' + startDate1.getDate() + '-' + startDate1.getFullYear());
+          startDate1.setDate(startDate1.getDate() + 1);
+
+          this.state.visitor_chart_colors.push("#3a4651");
+
+          this.state.visitor_chart_data.push(0);
+        }
+        this.state.visitor_days = [...this.state.visitor_days];
+        this.state.visitor_chart_data = [...this.state.visitor_chart_data];
+        this.state.visitor_chart_colors = [...this.state.visitor_chart_colors];
+      }
+    }
+  }
+
+  handlePreviewChange(value) {
+    if (value != undefined) {
+      if (value.startDate != undefined) {
+        this.setState({ rangeClick: 'staticRanges' });
+      } else {
+        this.setState({ rangeClick: '' });
+      }
+    } else {
+      this.setState({ rangeClick: 'inputRanges' });
+    }
+  }
+
+  formatDateDisplay(date, defaultText) {
+    if (!date) return defaultText;
+    return new Date(date).toLocaleDateString('en-US');
+  }
+
+  dateOpen() {
+    if (this.state.dateClick == 'close') {
+      this.setState({ dateClick: '' });
+    } else {
+      this.setState({ dateClick: 'close' });
+    }
+  }
+
+  render() {
+    const { authentication, dashboard, business } = this.props;
+    const { user } = authentication;
+
+    // visitors over time chart
+    if (dashboard.visitorsList != undefined) {
+      let visitor_created_dts = [];
+      this.state.visitor_chart_data = [];
+
+      dashboard.visitorsList.map(function (visitor) {
+        visitor_created_dts.push((new Date(visitor.create_date).getMonth() + 1) + '-' + new Date(visitor.create_date).getDate() + '-' + new Date(visitor.create_date).getFullYear());
+      });
+
+      this.state.visitor_days.map(function (day) {
+        let visit_count = visitor_created_dts.filter(function (e) {
+          return e == day;
+        });
+
+        this.state.visitor_chart_data.push(visit_count.length);
+      }, (this));
+    }
+
+    this.state.visitor_chart_data = [...this.state.visitor_chart_data];
+
+    const visitorsOverTime = {
+      datasets: [{
+        data: this.state.visitor_chart_data,
+        backgroundColor: this.state.visitor_chart_colors
+      }],
+      labels: this.state.visitor_days
+    };
+
+    // customers chart
+    /*let customer_chart_data;
+    if (dashboard.customersList != undefined && dashboard.visitorsList != undefined) {
+      customer_chart_data = [(dashboard.customersList.length - dashboard.visitorsList.length), dashboard.visitorsList.length];
+    } else {
+      customer_chart_data = [];
+    }
+    customer_chart_data = [...customer_chart_data];
+    const customers = {
+      labels: [
+        'New Customers',
+        'Old Customers'
+      ],
+      datasets: [{
+        data: customer_chart_data,
+        backgroundColor: [
+          '#FF6384',
+          '#36A2EB'
+        ],
+        hoverBackgroundColor: [
+          '#FF6384',
+          '#36A2EB'
+        ]
+      }]
+    };*/
+
+    // visitors chart
+    /*let visitor_chart_data;
+
+    if (dashboard.visitorsList != undefined) {
+      let countOneTime = 0;
+      let countRepeat = 0;
+      let visitorInclude = [];
+
+      dashboard.visitorsList.map(function (visitor) {
+        let alreadyVisited = visitorInclude.filter(function (entry) {
+          return (entry.business_id == visitor.business_id && entry.location_id == visitor.location_id && entry.customer_id == visitor.customer_id);
+        });
+
+        if (alreadyVisited.length > 0) {
+          countRepeat = countRepeat + 1;
+        } else {
+          countOneTime = countOneTime + 1;
+          visitorInclude.push({ "business_id": visitor.business_id, "location_id": visitor.location_id, "customer_id": visitor.customer_id });
+        }
+      });
+
+      visitor_chart_data = [countOneTime, countRepeat];
+    } else {
+      visitor_chart_data = [];
+    }
+    visitor_chart_data = [...visitor_chart_data];
+    const visitors = {
+      labels: [
+        'One time Visitors',
+        'Repeat Visitors'
+      ],
+      datasets: [{
+        data: visitor_chart_data,
+        backgroundColor: [
+          '#FF6384',
+          '#36A2EB'
+        ],
+        hoverBackgroundColor: [
+          '#FF6384',
+          '#36A2EB'
+        ]
+      }]
+    };*/
+
+    if(business.items != undefined && business.items.length > 0 && this.state.business == '') {   
+      this.setState({'business': business.items[0].business_name});
+    }
+
+    return (
+      <div>
+        <Sidebar {...this.props} />
+        <div className="wrapper">
+          <Header />
+          <div className="dashboard my-4">
+            <div className="container-fluid px-3">
+              <div className="row">
+                <div className="col-md-12 p-3">
+                  <div className="content">
+                    <div className="row">
+                      <div className="col-sm-6 col-12 p-0">
+                      {/*  <h2 class="text-capitalize">{(this.state.business != '' && user.role != "admin" ? this.state.business : (user && user.role == "admin" ? user.username : ''))}</h2>*/}
+                      </div>
+                      <div className="col-sm-6 col-12 pr-0 pl-sm-3 pl-0 d-flex flex-wrap justify-content-end align-items-center dateFilter">
+                        <div className="filter d-md-block d-sm-none d-none">
+                          <div className="input">
+                            <input
+                              type="text"
+                              readOnly
+                              value={this.formatDateDisplay(this.state.dateRangePicker.selection.startDate)}
+                            />
+                            <input
+                              type="text"
+                              readOnly
+                              value={this.formatDateDisplay(this.state.dateRangePicker.selection.endDate)}
+                            />
+                            <i class="fa fa-calendar fa-fw fa-fw" onClick={this.dateOpen} ></i>
+                          </div>
+                          <div className="showcalander">
+                            <DateRangePicker
+                              onChange={this.handleRangeChange.bind(this, 'dateRangePicker')}
+                              showSelectionPreview={true}
+                              moveRangeOnFirstSelection={false}
+                              className={'PreviewArea ' + this.state.dateClick}
+                              months={2}
+                              ranges={[this.state.dateRangePicker.selection]}
+                              direction="horizontal"
+                              // onRangeFocusChange={(value) => console.log(value)}
+                              onPreviewChange={(value) => this.handlePreviewChange(value)}
+                            /*staticRanges = {[]}
+                            inputRanges = {[]}*/
+                            />
+                          </div>
+                        </div>
+                        <div className="filter d-md-none d-sm-block d-block my-sm-0 my-2">
+                          <div className="input">
+                            <input
+                              type="text"
+                              readOnly
+                              value={this.formatDateDisplay(this.state.dateRange.selection.startDate)}
+                            />
+                            <input
+                              type="text"
+                              readOnly
+                              value={this.formatDateDisplay(this.state.dateRange.selection.endDate, 'Continuous')}
+                            />
+                            <i class="fa fa-calendar fa-fw fa-fw" onClick={this.dateOpen} ></i>
+                          </div>
+                          <div className="showcalander">
+                            <DateRange
+                              onChange={this.handleRangeChange.bind(this, 'dateRange')}
+                              moveRangeOnFirstSelection={false}
+                              ranges={[this.state.dateRange.selection]}
+                              className={'PreviewArea ' + this.state.dateClick}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/*<p>
+                                Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor.
+                            </p>*/}
+                  </div>
+                </div>
+              </div>
+              <div className="row my-3">
+                <div onClick={()=>this.props.history.push('/reports')} className={user.role && user.role !== 'admin' ? "col-md-6 p-0 d-flex flex-wrap pointer": "col-md-4 p-0 d-flex flex-wrap pointer"}>
+                  <div className="box bg-white rounded p-3 w-100 h-100">
+                    <div className="info text-center">
+                      <h1>{dashboard.visitorCount}  </h1> <span>Visitors</span>
+                      <p>Total Visitors on all locations</p>
+                    </div>
+                  </div>
+                </div>
+                <div onClick={()=>this.props.history.push('/customer')} className={user.role && user.role !== 'admin' ? "col-md-6 pl-md-3 pl-0 mt-md-0 mt-3 pr-0 d-flex flex-wrap pointer":" col-md-4 pl-md-3 pl-0 mt-md-0 mt-3 pr-0 d-flex flex-wrap pointer"}>
+                  <div className="box bg-white rounded p-3 w-100 h-100">
+                    <div className="info text-center">
+                      <h1>{dashboard.customerCount}</h1> <span>New Customers</span>
+                      <p>New customers at all locations</p>
+                    </div>
+                  </div>
+                </div>
+                {user.role && user.role === 'admin' ? <div onClick={()=>this.props.history.push('/business')} className="col-md-4 pl-md-3 pl-0 mt-md-0 mt-3 pr-0 d-flex flex-wrap pointer">
+                  <div className="box bg-white rounded p-3 w-100 h-100">
+                    <div className="info text-center">
+                      <h1>{dashboard.businessCount ? dashboard.businessCount.length : null}</h1> <span>New Business</span>
+                        <p>New Business Added</p>
+                    </div>
+                  </div>
+                </div>:null}
+              </div>
+              <div className="row my-4">
+                <h4 className="mb-3">Visitors Over Time</h4>
+                <div className="col-12 p-0 bg-white shadow p-4 rounded">
+                  <Bar
+                    data={visitorsOverTime}
+                    width={100}
+                    height={400}
+                    options={{
+                      maintainAspectRatio: false,
+                      legend: {
+                        display: false,
+                      },
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="row my-3">
+                <div className="col-xl-7 col-lg-12 col-md-12 pl-0 pr-xl-3 pr-0">
+                  <div className="card shadow">
+                    <div className="card-header bg-white p-0">
+                      <div className="row">
+                        <div className="col-12 p-3">
+                          <Tabs defaultActiveKey="latest" id="uncontrolled-tab-example" className="custom-tab-setting" >
+                            <Tab eventKey="contact" title="Visitors" disabled>
+                            </Tab>
+                            <Tab eventKey="latest" >
+                              <div Key="latest" className="tab-content bg-white mt-3 py-3 border-top">
+                                {dashboard.visitorsList != undefined ?
+                                  dashboard.visitorsList.slice(0, 3).map(function (visitor, index) {
+                                    return (
+                                      <div className="row border-bottom py-3" key={index}>
+                                        <div className="col-6 pl-0">
+                                          <div className="media">
+                                            <Image src='https://dummyimage.com/60x60/eee/0011ff.jpg' rounded className="align-self-start mr-3" />
+                                            <div className="media-body">
+
+                                              <h5>{visitor.customerInfo[0].firstname} {visitor.customerInfo[0].lastname}</h5>
+                                              <p>{visitor.BusinessInfo[0].business_name}</p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="col-2 p-0 text-right">
+                                          <div className="sales">{visitor.locationInfo.length != 0 ? visitor.locationInfo[0].name : ''}</div>
+                                          <div></div>
+                                        </div>
+                                        <div className="col-4 p-0 text-right">
+                                          <div className="sales">{this.formatDateDisplay(visitor.create_date)}</div>
+                                          <div>Recent Visit</div>
+                                        </div>
+                                      </div>
+                                    )
+                                  }, (this))
+                                  : ''
+                                }
+                              </div>
+                            </Tab>
+                          </Tabs>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-xl-5 col-lg-12 col-md-12 pr-0 pl-xl-3 pl-0 mt-xl-0 mt-3">
+                  <div className="card shadow">
+                    <div className="card-header bg-white p-0">
+                      <div className="row">
+                        <div className="col-12 p-3">
+                          <Tabs defaultActiveKey="thisweek" id="uncontrolled-tab-example" className="custom-tab-setting">
+                            <Tab eventKey="contact" title="New Customers" disabled>
+                            </Tab>
+                            <Tab eventKey="thisweek" >
+                              <div className="tab-content bg-white mt-3 py-3 border-top">
+                                {dashboard.customersList != undefined ?
+                                  dashboard.customersList.slice(0, 3).map(function (customer, index) {
+                                    return (
+                                      <div className="row border-bottom py-3" key={index}>
+                                        <div className="col-12 p-0">
+                                          <div className="media">
+                                            <Image src={customer.userprofileData.photo != undefined ? config.apiUrl.substring(0, config.apiUrl.length - 3)+customer.userprofileData.photo : 'https://dummyimage.com/60x60/eee/0011ff.jpg'} rounded className="align-self-start mr-3 profile_pic" />
+                                            <div className="media-body">
+                                              <h5 >{customer.firstname} {customer.lastname}</h5>
+                                              <p>{customer.business[0] == undefined ? customer.business.business_name : customer.business[0].business_name}</p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })
+                                  : ''
+                                }
+
+                              </div>
+                            </Tab>
+                          </Tabs>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/*<div className="row">
+                          <div className="col-12">
+                            <h4 className="mt-2 mb-3">Comparisons</h4>
+                          </div>
+                        </div>
+                        <div className="row">
+                          <div className="col-md-6 pr-3 pr-md-0 mt-3 mt-md-0 d-flex flex-wrap">
+                            <div className="bg-white p-3 rounded w-100 h-100">
+                              <div className="border-bottom pb-2">
+                                <h5>Customers</h5>
+                                <p>New vs Old Customers</p>
+                              </div>
+                              <div className="py-3">
+                                <Doughnut
+                                  data={customers}
+                                  width={100}
+                                  height={250}
+                                  options={{
+                                    maintainAspectRatio: false,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-6 mt-3 mt-md-0 d-flex flex-wrap">
+                            <div className="bg-white p-3 rounded w-100 h-100">
+                              <div className="border-bottom pb-2">
+                                <h5>Visitors</h5>
+                                <p>One time vs Repeat Visitors</p>
+                              </div>
+                              <div className="py-3">
+                                <Pie data={visitors} width={100}
+                                  height={250} options={{
+                                    maintainAspectRatio: false,
+                                    
+                                  }} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>*/}
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function mapState(state) {
+  const { authentication, dashboard, business } = state;
+  return { authentication, dashboard, business };
+}
+
+const actionCreators = {
+  getAllBusinessesVisitor: dashboardActions.getAllBusinessesVisitor,
+  getCustomerCounts: dashboardActions.getCustomerCounts,
+  getBusinessCounts: dashboardActions.getBusinessCounts,
+  getVisitorCounts: dashboardActions.getVisitorCounts,
+  getCustomers: dashboardActions.getCustomers,
+  getVisitors: dashboardActions.getVisitors,  
+  getLocationCustomerCounts: dashboardActions.getLocationCustomerCounts,
+  getLocationVisitorCounts: dashboardActions.getLocationVisitorCounts,
+  getLocationCustomers: dashboardActions.getLocationCustomers,
+  getLocationVisitors: dashboardActions.getLocationVisitors,
+  getBusinessById: businessActions.getBusinessById,
+  getAllBusiness: businessActions.getAllBusiness
+
+}
+
+const connectedDashboardPage = connect(mapState, actionCreators)(DashboardPage);
+export { connectedDashboardPage as DashboardPage };

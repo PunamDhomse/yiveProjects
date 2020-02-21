@@ -1,0 +1,395 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import config from 'config';
+import { connect } from 'react-redux';
+import { userActions, commonActions } from '../_actions';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Header } from '../Header/Header';
+import { Modal } from 'react-bootstrap';
+import Webcam from "react-webcam";
+import Form from 'react-bootstrap/Form';
+import Button from 'react-bootstrap/Button';
+import Image from 'react-bootstrap/Image';
+import NumberFormat from 'react-number-format';
+
+class ProfilePage extends React.Component {
+  constructor(props) {
+    super(props);
+    this.myRef = React.createRef()   // Create a ref object
+    this.state = {
+      stateUser: {
+        firstname: '',
+        lastname: '',
+        email: '',
+        phone: '',
+        gender: '',
+        address: '',
+        city: '',
+        state: '',
+        country: '',
+        dob: '',
+        photo: '',
+        linkedin: '',
+        facebook: '',
+        twitter: ''
+      },
+	  doValidate:{
+		  firstname:true,
+		  lastname:true,
+		  email:true,
+		  phone: false,
+        gender: false,
+        address: false,
+        city: false,
+        state: false,
+        country: false,
+        dob: false,
+        photo: false,
+        linkedin: false,
+        facebook: false,
+        twitter: false
+	  },
+      submitted: false,
+      noCameraPermission: false,
+      invalid: false,
+      mail: true,
+      modal: false,
+      webcamRef: null
+    };
+
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
+
+  componentDidMount() {
+    const { user } = this.props;
+    let userId = user._id;
+    //this.props.getUserById(userId);
+    this.props.getProfileById(userId).then(profile => {
+      let customer = {
+        firstname: profile.data.firstname,
+        lastname: profile.data.lastname,
+        email: profile.data.email,
+        phone: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].phone ? profile.data.userprofileData[0].phone : '' : '',
+        address: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].address ? profile.data.userprofileData[0].address : '' : '',
+        city: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].city ? profile.data.userprofileData[0].city : '' : '',
+        state: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].state ? profile.data.userprofileData[0].state : '' : '',
+        country: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].country ? profile.data.userprofileData[0].country : '' : '',
+        dob: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].dob ? profile.data.userprofileData[0].dob : '' : '',
+        gender: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].gender ? profile.data.userprofileData[0].gender : '' : '',
+        facebook: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].facebook ? profile.data.userprofileData[0].facebook : '' : '',
+        linkedin: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].linkedin ? profile.data.userprofileData[0].linkedin : '' : '',
+        twitter: profile.data.userprofileData.length > 0 ? profile.data.userprofileData[0].twitter ? profile.data.userprofileData[0].twitter : '' : ''
+      }
+
+      this.setState({ stateUser: customer }, () => {
+        if (profile.data.userprofileData.length > 0) {
+          this.props.regionsList(profile.data.userprofileData[0].country);
+        }
+      });
+    });
+    this.props.countriesList();
+  }
+
+  ValidateEmail = (mail) => {
+    if (/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(mail)) {
+      return (true)
+    }
+    return (false)
+  }
+
+  handleChange(event) {
+    const { name, value } = event.target;
+    const { stateUser } = this.state;
+    if (name == 'email') {
+      this.ValidateEmail(value) ? this.setState({ mail: true }) : this.setState({ mail: false });
+    }
+    if (name == 'country') {
+      this.props.regionsList(value);
+    }
+    this.setState({
+      stateUser: {
+        ...stateUser,
+        [name]: value
+      }
+    });
+  }
+
+  checkCustomer = () => {
+    let result = true;
+    let customer = this.state.stateUser;
+	let validations = this.state.doValidate;
+    Object.keys(customer).forEach(function (key) {
+      let status = ["facebook", "linkedin", "twitter"].includes(key);
+     /* if (customer[key] == '' && !status) {
+        result = false;
+      }*/
+	  
+	  if (customer[key] == '' && validations[key]) {
+        result = false;
+      }
+	  
+    });
+    return result;
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    this.setState({ submitted: true, invalid: false });
+    const { stateUser } = this.state;
+    const { user } = this.props;
+    let userId = user._id;
+    if (this.checkCustomer() && this.state.mail) {
+      stateUser._id = userId;
+      this.props.updateLoggedInProfile(stateUser);
+	  
+    }
+    else {
+      this.setState({ invalid: true });
+    }
+  }
+
+  uploadPic = (e) => {
+    if (e.target.files.length > 0) {
+      let file = e.target.files[0];
+      let formData = new FormData();
+      formData.append('file', file);
+      const { user } = this.props;
+      this.props.updateProfilePic(user._id, formData);
+    }
+  }
+
+  setRef = (ref) => {
+    this.setState({ webcamRef: ref });
+  }
+
+  capture = (props) => {
+    const imageSrc = this.state.webcamRef.getScreenshot();
+    fetch(imageSrc)
+      .then(function (res) { return res.arrayBuffer(); })
+      .then(function (buf) {
+        let file = new File([buf], `${props.user.firstname}.jpeg`, { type: 'image/jpeg' });
+        let formData = new FormData();
+        formData.append('file', file);
+        const { user } = props;
+        props.updateProfilePic(user._id, formData);
+      })
+    this.setState({ modal: false });
+  };
+
+
+  enrollFace = () => {
+    var width = (window.innerWidth > 0) ? window.innerWidth : screen.width;
+    if (width <= 768) {
+      return document.getElementById('userImage').click();
+    }
+    this.setState({ modal: true });
+  }
+
+
+  render() {
+    const { stateUser, submitted, errorMessage } = this.state;
+    const { user, alert, userprofile, countries, regions, match } = this.props;
+    return (
+      <div>
+        <Sidebar {...this.props} />
+        <div className="wrapper">
+          <Header />
+          
+          <div className="profile my-5">
+            <div className="container-fluid">
+              <div className="row">
+                <div className="col-md-12 text">
+				{errorMessage &&
+            <div className={`alert alert-danger`}>{errorMessage}</div>
+          }
+          {alert.message &&
+            <div className={`alert ${alert.type}`}>{alert.message}</div>
+          }
+                  <div className="row">
+                    {match.path && match.path !== '/settings' ? <div className="col-md-4 pl-0">
+                      <div className="card card-user shadow">
+                        <div className="image"></div>
+                        <div className="card-body">
+                          <div className="author">
+                            <a>
+                              <Image style={{ maxWidth: '10em' }} src={userprofile && userprofile.userprofileData.length > 0 ? config.apiUrl.substring(0, config.apiUrl.length - 3) + userprofile.userprofileData[0].photo : 'https://dummyimage.com/122x122/eee/0011ff.jpg'} roundedCircle />
+                              <input id="userImage" type="file" onChange={(e) => this.uploadPic(e)} name="myImage" capture="camera" accept="image/*" hidden />
+                              <h5 className="text-capitalize"> {user.username}</h5>
+                            </a>
+                            <p className="description">
+                              {user.email}
+                            </p>
+                          </div>
+                          <div className="row">
+                            <div className="col-6 text-right">
+                              <Button onClick={() => document.getElementById('userImage').click()} variant="primary" className="btn-sm">
+                                Upload Image
+                                    </Button>
+                            </div>
+                            <div className="col-6">
+                              <Button onClick={() => this.enrollFace()} variant="primary" className="btn-sm">
+                                Enroll Face
+                                    </Button>
+                            </div>
+                          </div>
+                          <Modal show={this.state.modal}>
+                            <Modal.Body>
+                              {this.state.noCameraPermission ? <div className="text-center">
+                                No permissions to access camera
+                              </div> : null}
+                              <Webcam
+                                height={'100%'}
+                                width={'100%'}
+                                ref={this.setRef}
+                                screenshotFormat="image/jpeg"
+                                onUserMedia={() => this.setState({ noCameraPermission: false })}
+                                onUserMediaError={() => this.setState({ noCameraPermission: true })}
+                              />
+                            </Modal.Body>
+                            <Modal.Footer>
+                              <Button variant="secondary" onClick={() => this.setState({ modal: false, noCameraPermission: false })}>
+                                Close
+                             </Button>
+                              <Button disabled={this.state.noCameraPermission} variant="primary" onClick={() => this.capture(this.props)}>
+                                Take Photo
+                               </Button>
+                            </Modal.Footer>
+                          </Modal>
+                        </div>
+                      </div>
+                    </div> : null}
+                    <div className={match.path && match.path !== '/settings' ? "col-md-8 pr-0" : "col-md-12 pr-0 pl-0"}>
+                      <div className="card shadow">
+                        <div className="card-header">
+                          <h5 className="">{match.path && match.path !== '/settings' ? 'Profile' : 'Settings'}</h5>
+                        </div>
+                        <div className="card-body">
+                          <Form onSubmit={this.handleSubmit}>
+                            <Form.Group controlId="formBasicEmail">
+                              <Form.Label>First Name <span className="text-danger">*</span></Form.Label>
+                              <Form.Control type="text" name="firstname" placeholder="Enter your firstname" value={stateUser.firstname} onChange={this.handleChange} />
+                              <Form.Text className="text-muted">
+                              </Form.Text>
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicEmail">
+                              <Form.Label>Last Name <span className="text-danger">*</span></Form.Label>
+                              <Form.Control type="text" name="lastname" placeholder="Enter your lastname" value={stateUser.lastname} onChange={this.handleChange} />
+                              <Form.Text className="text-muted">
+                              </Form.Text>
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>Email <span className="text-danger">*</span></Form.Label>
+                              <Form.Control type="text" name="email" placeholder="Enter your email" value={stateUser.email} onChange={this.handleChange} />
+                              {!this.state.mail ? <span style={{ color: 'red', fontSize: '12px' }}>Please enter a valid email</span> : null}
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>Phone</Form.Label>
+                              {/* <Form.Control type="text" country="US" name="phone" placeholder="Enter your phone"  value={(userprofile && !stateUser.phone) ? userprofile.phone : stateUser.phone } onChange={this.handleChange} /> */}
+                              <NumberFormat format="+1 (###) ###-####" mask="_" name="phone" id="formBasicPassword" class="form-control" placeholder="Enter your phone" value={stateUser.phone} onChange={this.handleChange} />
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>Address </Form.Label>
+                              <Form.Control type="text" name="address" placeholder="Enter your address" value={stateUser.address} onChange={this.handleChange} />
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>City</Form.Label>
+                              <Form.Control type="text" name="city" placeholder="Enter your city" value={stateUser.city} onChange={this.handleChange} />
+                            </Form.Group>
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>Country </Form.Label>
+                              <Form.Control name="country" as="select" value={stateUser.country} onChange={this.handleChange}  >
+                                <option value="0">Select country</option>
+                                {countries && countries.length &&
+                                  countries.map((country, index) =>
+                                    <option value={country._id}>{country.name}</option>
+                                  )};
+                                              </Form.Control>
+                            </Form.Group>
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>State</Form.Label>
+                              <Form.Control name="state" as="select" value={stateUser.state} onChange={this.handleChange}  >
+                                <option value="-1" >Select state</option>
+                                {regions && regions.length &&
+                                  regions.map((region, index) =>
+                                    <option value={region._id}>{region.name}</option>
+                                  )};
+                                              </Form.Control>
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>Date of birth</Form.Label>
+                              {/* <Form.Control type="text" name="dob" placeholder="Enter your DOB" value={(userprofile && !stateUser.dob) ? userprofile.dob : stateUser.dob } onChange={this.handleChange}  /> */}
+                              <NumberFormat format="##/##/####" name="dob" placeholder="DD/MM/YYYY" id="formBasicPassword" class="form-control" mask={['D', 'D', 'M', 'M', 'Y', 'Y', 'Y', 'Y']} placeholder="Enter your DOB" value={stateUser.dob} onChange={this.handleChange} />
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label className="pr-3">Gender</Form.Label>
+                              <Form.Check inline label="Male" name="gender" type="radio" value="male" checked={stateUser.gender == 'male'} onChange={this.handleChange} />
+                              <Form.Check inline label="Female" name="gender" type="radio" value="female" checked={stateUser.gender == 'female'} onChange={this.handleChange} />
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>Facebook Profile</Form.Label>
+                              <Form.Control type="text" name="facebook" placeholder="Enter your Fb profile" value={stateUser.facebook} onChange={this.handleChange} />
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>Linkedin Profile</Form.Label>
+                              <Form.Control type="text" name="linkedin" placeholder="Enter your Linkedin profile" value={stateUser.linkedin} onChange={this.handleChange} />
+                            </Form.Group>
+
+                            <Form.Group controlId="formBasicPassword">
+                              <Form.Label>Twitter Profile</Form.Label>
+                              <Form.Control type="text" name="twitter" placeholder="Enter your Twitter profile" value={stateUser.twitter} onChange={this.handleChange} />
+                            </Form.Group>
+                            <div className="row">
+                              {this.state.invalid ?
+                                <div className="col-12"><div className={`alert alert-danger`}>Please fill all fields</div></div> : null
+                              }
+                            </div>
+                            <Button variant="primary" id="test" className="customBtn float-right" type="submit">
+                              Update
+                                    </Button>
+                          </Form>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function mapState(state) {
+  const { authentication, alert } = state;
+  const { userprofile } = state.users;
+  const { user } = authentication;
+  console.log("state full", state);
+  const { countries, regions } = state.common;
+  return { user, alert, userprofile, countries, regions };
+
+}
+
+const actionCreators = {
+  getProfileById: userActions.getProfileById,
+  updateLoggedInProfile: userActions.updateLoggedInProfile,
+  countriesList: commonActions.getCountries,
+  regionsList: commonActions.getRegions,
+  updateProfilePic: userActions.updateProfilePic
+
+}
+
+const connectedProfilePage = connect(mapState, actionCreators)(ProfilePage);
+export { connectedProfilePage as ProfilePage };

@@ -1,0 +1,297 @@
+import { businessConstants, customerConstants } from '../_constants';
+import { businessService, userService, customerService } from '../_services';
+import { alertActions } from '.';
+import { history } from '../_helpers';
+
+export const businessActions = {
+    getAllBusiness,
+    newbusiness,
+    getBusinessById,
+    updateBusiness,
+    updateBusinessAndLocation,
+    deleteBusiness,
+    activate,
+    getBusinessLocationById,
+    getBusinessLocations,
+    //getBusinessData
+    //getUserByBusinessLocation
+};
+
+function create(dispatch, business) {
+
+    businessService.newBusiness(business.business)
+        .then(
+            result => {
+                businessService.newBusinessLocation(business.businessLocation, result.data._id)
+                    .then(
+                        result => {
+                            dispatch(success());
+                            history.push('/business');
+                            dispatch(alertActions.success('New business added successfully'));
+                        },
+                        error => {
+                            dispatch(failure(error.toString()));
+                            dispatch(alertActions.error(error.toString()));
+                        }
+                    );
+            },
+            error => {
+                dispatch(failure(error.toString()));
+                dispatch(alertActions.error(error.toString()));
+            }
+        );
+
+    function request(business) { return { type: businessConstants.REGISTER_REQUEST, business } }
+    function success(business) { return { type: businessConstants.REGISTER_SUCCESS, business } }
+    function failure(error) { return { type: businessConstants.REGISTER_FAILURE, error } }
+}
+
+function newbusiness(business, user = null) {
+    return dispatch => {
+        dispatch(request(business));
+        if (user == null) {
+            userService.register(business.business).then(u => {
+                business.business.business_owner_id = u.data._id;
+                create(dispatch, business);
+            }, error => {
+                dispatch(failure(error.toString()));
+                dispatch(alertActions.error(error.toString()));
+            });
+        } else {
+            business.business.business_owner_id = user.data._id;
+            create(dispatch, business);
+        }
+    };
+
+    function request(business) { return { type: businessConstants.REGISTER_REQUEST, business } }
+    function success(business) { return { type: businessConstants.REGISTER_SUCCESS, business } }
+    function failure(error) { return { type: businessConstants.REGISTER_FAILURE, error } }
+}
+
+
+// Get All Businesses from DB
+function getAllBusiness(businessOwnerId = '') {
+    return dispatch => {
+        dispatch(request());
+        //console.log("reaching");
+        return new Promise((resolve, reject)=> {
+            businessService.getAllBusiness(businessOwnerId)
+                .then(
+                    business => {
+                        dispatch(success(business))
+                        resolve(business);
+                    },
+                    error => dispatch(failure(error.toString()))
+                );
+        });
+    };
+
+    function request() { return { type: businessConstants.GETALL_REQUEST } }
+    function success(business) { return { type: businessConstants.GETALL_SUCCESS, business } }
+    function failure(error) { return { type: businessConstants.GETALL_FAILURE, error } }
+}
+
+// function getBusinessData(getby = 'all', byId = '', body) {
+//     return dispatch => {
+//         return new Promise((resolve, reject) => {
+//             dispatch(request());
+//             console.log("reaching to all customers");
+//             businessService.getBusinessData(getby, byId, body)
+//                 .then(
+//                     customer => {
+//                         dispatch(success(customer));
+//                         resolve(customer);
+//                     },
+//                     error => dispatch(failure(error.toString()))
+//                 );
+//         });
+//     };
+
+//     function request() { return { type: businessConstants.GETALL_REQUEST } }
+//     function success(business) { return { type: businessConstants.GETALL_SUCCESS, business } }
+//     function failure(error) { return { type: businessConstants.GETALL_FAILURE, error } }
+// }
+
+// Get Selective business location from DB
+function getBusinessLocations(id) {
+    return dispatch => {
+        dispatch(request());
+        return new Promise((resolve, reject)=> {
+        businessService.getBusinessLocations(id)
+            .then(
+                businessLocation => {
+                    dispatch(success(businessLocation))
+                    resolve(businessLocation);
+                },
+                error => dispatch(failure(error.toString()))
+            );
+        })
+    };
+
+    function request() { return { type: businessConstants.GETLOCATION_REQUEST } }
+    function success(businessLocation) { return { type: businessConstants.GETLOCATION_SUCCESS, businessLocation } }
+    function failure(error) { return { type: businessConstants.GETLOCATIONs_FAILURE, error } }
+}
+
+
+
+// Get Selective CUSTOMER by business and location from DB
+// function getUserByBusinessLocation(name, data) {
+//     const business_id, location_id;
+//     if(name == 'business_id'){
+//         business_id = data;
+//     }
+//     else if(name == 'location_id'){
+//         location_id = data;
+//     }
+//     else{
+//         business_id = ""; location_id = "";
+//     }
+//     return dispatch => {
+//         dispatch(request());
+//         businessService.getUserByBusinessLocation(business_id,location_id)
+//             .then(
+//                 businessLocation => dispatch(success(businessLocation)),
+//                 error => dispatch(failure(error.toString()))
+//             );
+//     };
+
+//     function request() { return { type: businessConstants.GETLOCATION_REQUEST } }
+//     function success(businessLocation) { return { type: businessConstants.GETLOCATION_SUCCESS, businessLocation } }
+//     function failure(error) { return { type: businessConstants.GETLOCATIONs_FAILURE, error } }
+// }
+
+
+// ACTIVATE THE USER/BUSINESS
+function activate(business) {
+    return dispatch => {
+        dispatch(request(business));
+        businessService.updateBusiness(business)
+            .then(
+                business => dispatch(success(business.data)),
+                error => dispatch(failure(business, error.toString()))
+            );
+    };
+
+    function request(business) { return { type: businessConstants.ACTIVATE_REQUEST, business } }
+    function success(business) { return { type: businessConstants.ACTIVATE_SUCCESS, business } }
+    function failure(business, error) { return { type: businessConstants.ACTIVATE_FAILURE, business, error } }
+}
+
+// UPDATE BUSINESS
+function updateBusiness(business) {
+    return dispatch => {
+        dispatch(request());
+
+        businessService.updateBusiness(business)
+            .then(
+                business => {
+                    dispatch(success());
+                    history.push('/business');
+                    dispatch(alertActions.success('Business updated successfully'));
+                },
+                error => {
+                    dispatch(failure(error.toString()));
+                    dispatch(alertActions.error(error.toString()));
+                }
+            );
+    };
+
+    function request() { return { type: businessConstants.UPDATE_REQUEST } }
+    function success(business) { return { type: businessConstants.UPDATE_SUCCESS, business } }
+    function failure(error) { return { type: businessConstants.UPDATE_FAILURE, error } }
+}
+
+// UPDATE BUSINESS
+function updateBusinessAndLocation(business, businessLocation, user) {
+    return dispatch => {
+        dispatch(request());
+        businessService.updateBusiness(business)
+            .then(
+                result => {
+                    businessService.updateBusinessLocation(businessLocation, business._id)
+                        .then(
+                            result => {
+                                userService.update(user).then(()=>{
+                                    dispatch(success());
+                                    history.push('/business');
+                                    dispatch(alertActions.success('Updated business and location successfully'));
+                                },err=>{
+                                    dispatch(failure(error.toString()));
+                                    dispatch(alertActions.error(error.toString()));
+                                });
+                            },
+                            error => {
+                                dispatch(failure(error.toString()));
+                                dispatch(alertActions.error(error.toString()));
+                            }
+                        );
+                },
+                error => {
+                    dispatch(failure(error.toString()));
+                    dispatch(alertActions.error(error.toString()));
+                }
+            );
+    };
+
+    function request() { return { type: businessConstants.UPDATE_REQUEST } }
+    function success(business) { return { type: businessConstants.UPDATE_SUCCESS, business } }
+    function failure(error) { return { type: businessConstants.UPDATE_FAILURE, error } }
+}
+
+// Get Selective Users from DB
+function getBusinessById(id) {
+    return dispatch => {
+        dispatch(request());
+        return new Promise((resolve, reject) => {
+            businessService.getBusinessById(id)
+                .then(
+                    (business) => {
+                        dispatch(success(business));
+                        return resolve(business);
+                    },
+                    error => {
+                        reject(error);
+                        dispatch(failure(error.toString()))
+                    }
+                );
+        });
+    };
+
+    function request() { return { type: businessConstants.GET_REQUEST } }
+    function success(business) { return { type: businessConstants.GET_SUCCESS, business } }
+    function failure(error) { return { type: businessConstants.GET_FAILURE, error } }
+}
+
+// Get Selective Users from DB
+function getBusinessLocationById(id) {
+    return dispatch => {
+        dispatch(request());
+        businessService.getBusinessLocations(id)
+            .then(
+                business => dispatch(success(business)),
+                error => dispatch(failure(error.toString()))
+            );
+    };
+
+    function request() { return { type: businessConstants.GET_REQUEST } }
+    function success(business) { return { type: businessConstants.GET_SUCCESS, business } }
+    function failure(error) { return { type: businessConstants.GET_FAILURE, error } }
+}
+
+
+// prefixed function name with underscore because delete is a reserved word in javascript
+function deleteBusiness(id) {
+    return dispatch => {
+        dispatch(request(id));
+        businessService.deleteBusiness(id)
+            .then(
+                business => dispatch(success(id)),
+                error => dispatch(failure(id, error.toString()))
+            );
+    };
+
+    function request(id) { return { type: businessConstants.DELETE_REQUEST, id } }
+    function success(id) { return { type: businessConstants.DELETE_SUCCESS, id } }
+    function failure(id, error) { return { type: businessConstants.DELETE_FAILURE, id, error } }
+}

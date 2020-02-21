@@ -1,0 +1,139 @@
+import config from 'config';
+import { authHeader } from '../_helpers';
+
+export const businessService = {
+    newBusiness,
+    getAllBusiness,
+    getBusinessById,
+    updateBusiness,
+    deleteBusiness,
+    newBusinessLocation,
+    updateBusinessLocation,
+    getBusinessLocations,
+    //getBusinessData
+};
+
+function newBusiness(business) {
+    const requestOptions = {
+        method: 'POST',
+        headers: { ...authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(business)
+    };
+    return fetch(`${config.apiUrl}/business/add`, requestOptions).then(handleResponse);
+}
+
+
+function newBusinessLocation(businessLocations, business_id) {
+    let response = '';
+    businessLocations.map((businessLocation, index) => {
+        businessLocation.business_id = business_id;
+        const requestOptions = {
+            method: 'POST',
+            headers: { ...authHeader(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(businessLocation)
+        };
+        response = fetch(`${config.apiUrl}/location/add`, requestOptions).then(handleResponse);
+    });
+    return response;
+}
+
+function getAllBusiness(businessOwnerId) {
+    const requestOptions = {
+        method: 'GET',
+        headers: authHeader()
+    };
+    console.log("reached");
+    if (businessOwnerId) {
+        return fetch(`${config.apiUrl}/business/list/owner/${businessOwnerId}`, requestOptions).then(handleResponse);
+    } else {
+        return fetch(`${config.apiUrl}/business/list/${businessOwnerId}`, requestOptions).then(handleResponse);
+    }
+}
+
+// function getBusinessData(getby, byId, data) {
+//     const requestOptions = {
+//         method: 'POST',
+//         headers: { ...authHeader(), 'Content-Type': 'application/json' },
+//         body: JSON.stringify(data)
+//     };
+//     console.log("reached");
+
+//     return fetch(`${config.apiUrl}/business/list/${getby}/${byId}`, requestOptions).then(handleResponse);
+// }
+
+function getBusinessById(id) {
+    const requestOptions = {
+        method: 'GET',
+        headers: authHeader()
+    };
+    //console.log('-----------------------------------------this is called on this page');
+    return fetch(`${config.apiUrl}/businesswithlocations/${id}`, requestOptions).then(handleResponse);
+}
+
+function getBusinessLocations(id) {
+    const requestOptions = {
+        method: 'GET',
+        headers: authHeader()
+    };
+
+    return fetch(`${config.apiUrl}/location/${id}`, requestOptions).then(handleResponse);
+}
+
+function updateBusiness(business) {
+    console.log('updating business', business);
+    const requestOptions = {
+        method: 'PUT',
+        headers: { ...authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(business)
+    };
+
+    return fetch(`${config.apiUrl}/business/${business._id}`, requestOptions).then(handleResponse);;
+}
+
+function updateBusinessLocation(businessLocations, business_id) {
+    let response = '';
+    businessLocations.map((businessLocation, index) => {
+        console.log(businessLocation, 'zxfsdfsdsd');
+        businessLocation.business_id = business_id;
+        const requestOptions = {
+            method: 'PUT',
+            headers: { ...authHeader(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(businessLocation)
+        };
+        response = fetch(`${config.apiUrl}/location/business/${business_id}`, requestOptions).then(handleResponse);
+    });
+    return response;
+}
+
+// prefixed function name with underscore because delete is a reserved word in javascript
+function deleteBusiness(id) {
+    const requestOptions = {
+        method: 'DELETE',
+        headers: authHeader()
+    };
+
+    return fetch(`${config.apiUrl}/business/${id}`, requestOptions).then(handleResponse);
+}
+
+function logout() {
+    // remove user from local storage to log user out
+    localStorage.removeItem('user');
+}
+function handleResponse(response) {
+    return response.text().then(text => {
+        const data = text && JSON.parse(text);
+        console.log(response)
+        if (!response.ok) {
+            if (response.status === 401) {
+                // auto logout if 401 response returned from api
+                logout();
+                window.location.href = '/';
+            }
+
+            const error = (data && data.message) || response.statusText;
+            return Promise.reject(error);
+        }
+        console.log('this is ', data);
+        return data;
+    });
+}

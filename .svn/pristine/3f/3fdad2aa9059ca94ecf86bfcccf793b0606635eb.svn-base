@@ -1,0 +1,430 @@
+import React, { Component } from 'react';
+import { Link } from 'react-router-dom';
+import config from 'config';
+import { connect } from 'react-redux';
+import { businessActions, deviceActions, customerActions } from '../_actions';
+import { Modal, Tabs, Tab } from 'react-bootstrap';
+import Form from 'react-bootstrap/Form';
+import Button from 'react-bootstrap/Button';
+import Image from 'react-bootstrap/Image';
+import moment from 'moment';
+import Table from 'react-bootstrap/Table';
+import DataTable from 'react-data-table-component';
+
+class MemberPhoto extends Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            addModal: false,
+            editModal: false,
+            formdata: {
+                photo: '',
+                device: '',
+                location: '',
+                member: this.props.match.params.customer_id
+            },
+            selectedPhoto: {
+                pic: '',
+                device: '',
+                location: '',
+                member: this.props.match.params.customer_id
+            },
+            invalid: false,
+            invalid1: false,
+            photos: []
+        }
+    }
+
+    componentDidMount() {
+        const { user } = this.props.authentication;
+        const authUser = user;
+        if (authUser && authUser.role == 'businessOwner') {
+            this.props.getBusiness(authUser._id).then(business => {
+                this.props.getAllDevices(business.data[0]._id)
+            });
+        } else {
+            this.props.getAllDevices('all')
+        }
+        this.getAllPhotos();
+    }
+
+    getAllPhotos = () => {
+        this.props.getPhotos(this.props.match.params.customer_id).then(res => {
+
+            console.log("photos=" + JSON.stringify(res.data));
+            this.setState({ photos: res.data });
+        })
+    }
+
+    handleChange = (event) => {
+        const { name, value } = event.target;
+        const { formdata } = this.state;
+        this.setState({
+            formdata: {
+                ...formdata,
+                [name]: value
+            }
+        });
+    }
+
+    handleUpdateChange = (event) => {
+        debugger;
+        const { name, value } = event.target;
+        const { selectedPhoto } = this.state;
+        this.setState({
+            selectedPhoto: {
+                ...selectedPhoto,
+                [name]: value
+            }
+        });
+    }
+
+    selectPhotoToEdit = (photo) => {
+        let data = {};
+        data['photo'] = photo['photo'];
+        data['_id'] = photo['_id'];
+        data['member'] = photo['member'];
+        data['pic'] = '';
+        data['device'] = photo['device']['_id'];
+        data['location'] = photo['location']['_id'];
+        this.setState({ selectedPhoto: data, editModal: true });
+    }
+
+
+    actvateOrdeactivate = (data) => {
+        let formData = new FormData();
+        formData.append('status', data.status);
+        this.props.editPhoto(formData, data['id']).then(() => {
+            this.getAllPhotos();
+        });
+    }
+
+
+    getActions(photo) {
+        return <div>
+            <i onClick={() => this.selectPhotoToEdit(photo)} className="fa fa-edit fa-fw pointer"></i>
+            {photo.status ? <i onClick={() => this.actvateOrdeactivate({ status: false, id: photo._id })} className="fa fa-remove fa-fw pointer"></i> : <i onClick={() => this.actvateOrdeactivate({ status: true, id: photo._id })} className="fa fa-check fa-fw pointer"></i>}
+        </div>;
+    }
+
+    uploadPic = (e) => {
+        if (e.target.files.length > 0) {
+            let obj = this.state.formdata;
+            obj['photo'] = e.target.files[0]
+            this.setState({ formdata: obj });
+            var fr = new FileReader();
+            fr.onload = this.onFileReaderLoad;
+            fr.readAsDataURL(e.target.files[0]);
+        }
+    }
+
+    uploadeditPic = (e) => {
+        if (e.target.files.length > 0) {
+            let obj = this.state.selectedPhoto;
+            obj['pic'] = e.target.files[0]
+            this.setState({ selectedPhoto: obj });
+            var fr = new FileReader();
+            fr.onload = this.oneditFileReaderLoad;
+            fr.readAsDataURL(e.target.files[0]);
+        }
+    }
+
+    oneditFileReaderLoad(e) {
+        document.getElementById('pimg1').setAttribute('src', e.target.result);
+    };
+
+    onFileReaderLoad(e) {
+        document.getElementById('pimg').setAttribute('src', e.target.result);
+    };
+
+    handleSubmit = () => {
+        this.setState({ invalid: false });
+        let data = this.state.formdata;
+
+        console.log("formdata" + JSON.stringify(data));
+        if (data['location'] == '' && this.props.customer.location_id !== null) {
+            data['location'] = this.props.customer.location_id;
+        }
+        if (data['location'] == '' || data['location'] == 'all' || data['photo'] == '' || data['device'] == '') {
+            return this.setState({ invalid: true });
+        }
+
+        if (data['photo'] == '') {
+            return this.setState({ invalid: true });
+        }
+        let formData = new FormData();
+        formData.append('file', data['photo']);
+        formData.append('device', data['device']);
+        formData.append('location', data['location']);
+        formData.append('member', data['member']);
+        this.props.addPhoto(formData, data['member']).then(() => {
+            this.getAllPhotos();
+            this.setState({ addModal: false });
+        });
+    }
+
+    handleEditSubmit = () => {
+        this.setState({ invalid1: false });
+        let data = this.state.selectedPhoto;
+        if (data['location'] == '' || data['location'] == null || data['device'] == '') {
+            return this.setState({ invalid1: true });
+        }
+        let formData = new FormData();
+        if (data['pic']) {
+            formData.append('file', data['pic']);
+        }
+        formData.append('device', data['device']);
+        //formData.append('location', data['location']);
+        formData.append('member', data['member']);
+        this.props.editPhoto(formData, data['_id']).then(() => {
+            this.getAllPhotos();
+            this.setState({ editModal: false });
+        });
+    }
+
+    getCurrentLoc = () => {
+
+        //alert("BusinessLocation="+this.props.business.businessLocation);
+        if (this.props.business.businessLocation && this.props.business.businessLocation.length) {
+            let location = this.props.business.businessLocation.filter(elem => elem._id != this.props.customer.location_id);
+
+            if (location.length > 0) {
+                return location[0]['name'];
+            }
+        }
+        return '';
+    }
+
+    render() {
+        const { business, devices, authentication } = this.props;
+        const { user } = authentication;
+        const photoColumns = [
+            /*{
+                name: '#',
+                selector: 'sno',
+                sortable: true,
+                grow: 0,
+            },
+            {
+                name: 'Photo',
+                selector: 'photo',
+                sortable: true,
+                grow: 1
+            },*/
+            {
+                name: 'Date',
+                selector: 'date',
+                sortable: true,
+                right: true,
+            },
+            {
+                name: 'Location',
+                selector: 'location',
+                sortable: true
+            },
+            {
+                name: 'Device',
+                selector: 'device',
+                sortable: true,
+                grow: 1
+            },
+            /*{
+                name: 'Type',
+                selector: 'type',
+                sortable: true,
+
+            },*/
+
+            {
+                name: 'Actions',
+                selector: 'actions',
+                right: true,
+            },
+        ];
+        let photoData = this.state.photos.map((ph, index) => {
+			/*var deviceName = '';
+			var locationName = '';
+			if(ph.device.length>0)
+				var deviceName = ph.device[0].name;
+			if(ph.location.length>0){
+				var locationName = ph.location[0].name;
+			}*/
+
+            return {
+                //sno: index + 1,
+                //photo: ph.photo,
+                date: moment(ph.create_date).format('MM/DD/YYYY HH:MM:SS') + 'EST',
+                location: ph.location.name,
+                device: ph.device.name,
+                //type: ph.status ? 'Active' : 'In Active',
+                actions: this.getActions(ph)
+            }
+        });
+
+
+        return (
+            <div className="card-body">
+                <Modal onHide={() => this.setState({ addModal: false })}
+                    show={this.state.addModal}
+                    size="lg"
+                    aria-labelledby="contained-modal-title-vcenter"
+                    centered
+                    id="newMember"
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title id="contained-modal-title-vcenter">
+                            Add New Photo
+                        </Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <div className="row">
+                            <div className="col-12 text-center">
+                                <Image id="pimg" style={{ width: '8em', height: '8em', objectFit: 'cover' }} src="https://www.w3schools.com/howto/img_avatar.png" roundedCircle />
+                            </div>
+                            <div className="col-12 text-center mt-2">
+                                <Button onClick={() => document.getElementById('userImage11').click()} variant="primary" className="btn-sm">
+                                    Upload Image
+                                </Button>
+                            </div>
+                        </div>
+                        <input id="userImage11" type="file" onChange={(e) => this.uploadPic(e)} name="myImage" accept="image/*" hidden />
+                        {/*user.role && user.role === 'admin' ? <Form.Group controlId="formBasicEmail">
+                            <Form.Label>Business</Form.Label>
+                            <Form.Control type="text" value={business.businessInfo.business_name ? business.businessInfo.business_name : ''} disabled />
+                            <Form.Text className="text-muted">
+                            </Form.Text>
+                        </Form.Group> : null */}
+                        {/*<Form.Group controlId="formBasicEmail">
+                            <Form.Label>Location</Form.Label>
+                            <Form.Control type="text" value={this.getCurrentLoc()} readonly />
+                            <Form.Text className="text-muted">
+                            </Form.Text>
+                        </Form.Group> */}
+                        <Form.Group controlId="formBasicPassword">
+                            <Form.Label>Device</Form.Label>
+                            <Form.Control name="device" as="select" onChange={this.handleChange} >
+                                <option value=''>Select device</option>
+                                {devices && devices.length &&
+                                    devices.map((country, index) =>
+                                        <option value={country._id}>{country.name}</option>
+                                    )};
+                            </Form.Control>
+                        </Form.Group>
+
+                        <Form.Group controlId="formBasicPassword">
+                            <Form.Label>Location</Form.Label>
+                            <Form.Control name="location" as="select" onChange={this.handleChange}  >
+                                <option value=''>Select Location</option>
+                                {Array.isArray(business.businessLocation) ?
+                                    business.businessLocation.map((location, index) =>
+                                        <option value={location._id}>{location.name}</option>
+                                    ) : null};
+                            </Form.Control>
+                        </Form.Group>
+                        <div className="row">
+                            {this.state.invalid ? <div className="col-12">
+                                <span className="text-danger text-sm">All fields are required</span>
+                            </div> : null}
+                        </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button onClick={() => this.handleSubmit()} variant="primary">Submit</Button>
+                    </Modal.Footer>
+                </Modal>
+
+
+
+                <Modal onHide={() => this.setState({ editModal: false })}
+                    show={this.state.editModal}
+                    size="lg"
+                    aria-labelledby="contained-modal-title-vcenter"
+                    centered
+                    id="newMember"
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title id="contained-modal-title-vcenter">
+                            Edit Photo
+                        </Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <div className="row">
+                            <div className="col-12 text-center">
+                                <Image id="pimg1" style={{ width: '8em', height: '8em', objectFit: 'cover' }} src={config.apiUrl.substring(0, config.apiUrl.length - 3) + this.state.selectedPhoto.photo} roundedCircle />
+                            </div>
+                            <div className="col-12 text-center mt-2">
+                                <Button onClick={() => document.getElementById('userImage12').click()} variant="primary" className="btn-sm">
+                                    Upload Image
+                                </Button>
+                            </div>
+                        </div>
+                        <input id="userImage12" type="file" onChange={(e) => this.uploadeditPic(e)} name="myImage" accept="image/*" hidden />
+                        <Form.Group controlId="formBasicPassword">
+                            <Form.Label>Device</Form.Label>
+                            <Form.Control name="device" value={this.state.selectedPhoto.device} as="select" onChange={this.handleUpdateChange} >
+                                <option value=''>Select device</option>
+                                {devices && devices.length &&
+                                    devices.map((country, index) =>
+                                        <option value={country._id}>{country.name}</option>
+                                    )};
+                            </Form.Control>
+                        </Form.Group>
+                        {this.props.customer && this.props.customer.location_id === null ?
+                            <Form.Group controlId="formBasicPassword">
+                                <Form.Label>Location</Form.Label>
+                                <Form.Control name="location" as="select" onChange={this.handleUpdateChange}  >
+                                    <option value=''>Select Location</option>
+                                    {Array.isArray(business.businessLocation) ?
+                                        business.businessLocation.map((location, index) =>
+                                            <option value={location._id}>{location.name}</option>
+                                        ) : null};
+                            </Form.Control>
+                            </Form.Group> : null}
+                        <div className="row">
+                            {this.state.invalid1 ? <div className="col-12">
+                                <span className="text-danger text-sm">All fields are required</span>
+                            </div> : null}
+                        </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button onClick={() => this.handleEditSubmit()} variant="primary">Submit</Button>
+                    </Modal.Footer>
+                </Modal>
+
+                <div className="d-flex justify-content-end">
+                    <Button onClick={() => { this.props.getBusinessById(this.props.customer.business_id); this.props.getBusinessLocations(this.props.customer.business_id); this.setState({ addModal: true }) }} variant="primary">
+                        Add New Photo
+                                   </Button>
+                </div>
+                <div className="table-responsive dataTables photos">
+                    <DataTable className="table table-stripped table-bordered"
+                        columns={photoColumns}
+                        data={photoData}
+                        pagination
+                        paginationPerPage={25}
+                        paginationRowsPerPageOptions={[25, 50, 100]}
+                    />
+                </div>
+            </div>
+        );
+    }
+}
+
+function mapState(state) {
+    const { authentication, business, device } = state;
+    let devices = device.items;
+    return { authentication, business, devices };
+}
+
+const actionCreators = {
+    getBusinessLocations: businessActions.getBusinessLocations,
+    getAllDevices: deviceActions.getAllDevices,
+    getBusiness: businessActions.getAllBusiness,
+    addPhoto: customerActions.addPhoto,
+    editPhoto: customerActions.editPhoto,
+    getPhotos: customerActions.getPhotos,
+    getBusinessById: businessActions.getBusinessById
+}
+
+
+const connectedMemberPhoto = connect(mapState, actionCreators)(MemberPhoto);
+export { connectedMemberPhoto as MemberPhoto };

@@ -1,0 +1,187 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { userActions, customerActions, visitorActions, businessActions} from '../_actions';
+import {Sidebar} from '../Sidebar/Sidebar';
+import {Header} from '../Header/Header';
+import Form from 'react-bootstrap/Form';
+import Button from 'react-bootstrap/Button';
+import Image from 'react-bootstrap/Image';
+
+class AddVisitorPage extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+         visitor: {
+                        business_id : '',
+                        location_id : '',
+                        customer_id: '',
+                        desc:         ''
+               },
+         submitted: false
+       };
+       
+   this.handleChange = this.handleChange.bind(this);
+   this.handleSubmit = this.handleSubmit.bind(this);
+
+   }
+
+   componentDidMount() {
+     const {user} = this.props.authentication;
+     const authUser = user;
+     if(authUser && authUser.role == 'businessOwner'){
+       this.props.getAllBusinesses(authUser._id);
+     } else {
+       this.props.getAllBusinesses();
+     }
+   }
+
+   handleChange(event) {
+      const { name, value } = event.target;
+      const { visitor } = this.state;
+
+      //console.log(stateUser);
+        if(name == 'business_id'){
+          this.props.getBusinessLocations(value);
+        }
+
+        if(name == 'location_id' && value != '-1'){
+          this.props.getAllCustomers('location_id', value);
+        }
+        //console.log("works");
+        this.setState({
+          visitor: {
+                    ...visitor,
+                    [name]: value
+                  }
+        });
+      }
+  
+      handleSubmit(event) {
+          event.preventDefault();
+          this.setState({ submitted: true });
+          const { visitor } = this.state;
+          //console.log('submitting stateUser', stateUser);
+          if (visitor.business_id || visitor.location_id ||  visitor.customer_id ) {
+            this.props.addNewVisitor(visitor);
+          }
+          else{
+            this.setState({errorMessage:'Please verify all the info. again'})
+          }
+      }
+
+   
+  render() {
+    const { alert, business, adding, customer } = this.props;
+    const { visitor, errorMessage } = this.state;
+    const { businessLocation } = business;
+    
+      return (
+        <div>
+        <Sidebar { ...this.props } />
+        <div className="wrapper">
+            <Header />
+            <div className="row my-5">
+                <div className="container-fluid">
+                  <div className="row">
+                    {errorMessage &&
+                      <div className="col-12"><div className={`alert alert-danger`}>{errorMessage}</div></div>
+                    }
+                  {alert.message &&
+                      <div className="col-12"><div className={`alert ${alert.type}`}>{alert.message}</div></div>
+                    }
+                </div>
+                <div className="row mb-3">
+                  <div className="col-6">
+                    <h3>Add New Visitor</h3>
+                  </div>
+                  <div className="col-6 d-flex justify-content-end align-items-center">
+                    <Link to="/visitor" className=""><i class="fa fa-arrow-circle-left fa-fw"></i></Link>
+                  </div>
+                </div>
+                <Form  onSubmit={this.handleSubmit}>
+                <div className="row">
+                             <div className="col-12">
+                                <div className="card shadow">
+                                   <div className="card-body">
+                                    <div className="row">
+                                      <div className="col-md-12 col-sm-12 col-12 p-0">
+                                        <Form.Group controlId="exampleForm.ControlSelect1">
+                                            <Form.Label>Business</Form.Label>
+                                            <Form.Control name="business_id" as="select"  value={visitor.business_id} onChange={this.handleChange}>
+                                            <option >Select business</option>
+                                            {business.items && business.items.length &&
+                                                business.items.map((business, index) =>
+                                                <option value={business._id}>{business.business_name}</option>
+                                            )};
+                                            </Form.Control>
+                                          </Form.Group>
+                                          <Form.Group controlId="exampleForm.ControlSelect1">
+                                            <Form.Label>Location</Form.Label>
+                                            <Form.Control name="location_id" as="select" value={visitor.location_id} onChange={this.handleChange}>
+                                            <option >Select location</option>
+                                            {businessLocation && businessLocation.length ?
+                                                businessLocation.map((businessLocation, index) =>
+                                                <option value={businessLocation._id}>{businessLocation.name}</option> )
+                                                : 
+                                                <option value='-1'>No business location - Add new location</option>
+                                            };
+                                            </Form.Control>
+                                          </Form.Group>
+                                          <Form.Group controlId="exampleForm.ControlSelect1">
+                                            <Form.Label>Customer</Form.Label>
+                                            <Form.Control name="customer_id" as="select" value={visitor.customer_id} onChange={this.handleChange}>
+                                            <option >Select customer</option>
+                                            {customer.items && customer.items.map((customer, index) =>
+                                                customer.userprofileData.length > 0 ? <option value={customer._id}>{customer.firstname}</option>:null
+                                            )};
+                                            </Form.Control>
+                                      </Form.Group>
+                                      </div>
+                                      <div className="col-md-12 col-sm-12 col-12">
+                                        <Form.Group controlId="formBasicEmail">
+                                              <Form.Label>Description</Form.Label>
+                                              <Form.Control  as="textarea" aria-label="With textarea" name="desc" value={visitor.desc} onChange={this.handleChange} placeholder="Enter Description of the visitor" />
+                                              <Form.Text className="text-muted">
+                                              </Form.Text>
+                                            </Form.Group> 
+                                      <Button variant="primary" className="customBtn" type="submit">
+                                              Add New Visitor
+                                            </Button>
+                                      {adding && 
+                                        <img src="data:image/gif;base64,R0lGODlhEAAQAPIAAP///wAAAMLCwkJCQgAAAGJiYoKCgpKSkiH/C05FVFNDQVBFMi4wAwEAAAAh/hpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh+QQJCgAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa+dIAAAh+QQJCgAAACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkECQoAAAAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkECQoAAAAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo/IpHI5TAAAIfkECQoAAAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo/IpFKSAAAh+QQJCgAAACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh+QQJCgAAACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAkKAAAALAAAAAAQABAAAAMyCLrc/jDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA==" />
+                                      }
+                                      </div>
+                                    </div>
+                    
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+                  </Form>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      );
+    }
+}
+function mapState(state) {
+  const { alert, business, adding, authentication, customer } = state;
+  console.log("customer", customer);
+  return { alert, business, adding, authentication, customer  };
+
+
+}
+
+const actionCreators = {
+    getAllBusinesses: businessActions.getAllBusiness,
+    getBusinessLocations: businessActions.getBusinessLocations,
+    getAllCustomers: customerActions.getAllCustomers,
+    addNewVisitor: visitorActions.addNewVisitor
+    
+}
+
+const connectedAddVisitorPage = connect(mapState, actionCreators)(AddVisitorPage);
+export { connectedAddVisitorPage as AddVisitorPage };

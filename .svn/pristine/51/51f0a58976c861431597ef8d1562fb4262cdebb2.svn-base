@@ -1,0 +1,170 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { userActions } from '../_actions';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Header } from '../Header/Header';
+import Table from 'react-bootstrap/Table';
+import Button from 'react-bootstrap/Button';
+import DataTable from 'react-data-table-component';
+
+class UsersPage extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      deleted: false
+    }
+  }
+
+  componentDidMount() {
+    //console.log('mounted')
+    this.props.getUsers();
+  }
+
+  handleEditUser(e, id) {
+    e.preventDefault();
+    this.props.editUser(id);
+  }
+
+  handleDeleteUser(e, id) {
+    e.preventDefault();
+    this.props.deleteUser(id);
+  }
+  handleActivateUser(e, id) {
+    e.preventDefault();
+    const user = {};
+    user._id = id;
+    user.status = true;
+    this.props.activateUser(user);
+  }
+  // getActions(status, user_id) {
+  //   return <div> <Link to={{ pathname: `edituser/${user_id}` }} className=""><i className="fa fa-edit fa-fw"></i></Link>
+  //     {status ?
+  //       <Link to="/" className="" onClick={e => this.handleDeleteUser(e, user_id)} ><i className="fa fa-check fa-fw"></i></Link>
+  //       :
+  //       <Link to="/" className="" onClick={e => this.handleActivateUser(e, user_id)} ><i className="fa fa-remove fa-fw"></i></Link>
+  //     } </div>
+  // }
+
+  getActionToName(name, user_id){
+    return <div> <Link to={{ pathname: `edituser/${user_id}` }} className="">{name}</Link></div>
+  }
+
+  render() {
+    const { users, alert } = this.props;
+    const columns = [
+      // {
+      //   name: '#',
+      //   selector: 'sno',
+      //   sortable: true,
+      //   grow: 0,
+      // },
+      {
+        name: 'Name',
+        selector: 'name',
+        sortable: true,
+        grow: 1
+      },
+      {
+        name: 'Email',
+        selector: 'email',
+        sortable: true
+      },
+      {
+        name: 'Username',
+        selector: 'username',
+        sortable: true
+      },
+      {
+        name: 'Status',
+        selector: 'status',
+        sortable: true,
+        right: true,
+
+      }
+      // {
+      //   name: 'Actions',
+      //   selector: 'actions',
+      //   right: true,
+      // },
+    ];
+    let tableData = [];
+    if (users.items && users.items.length) {
+      users.items.forEach((users, index) => {
+        const data = {
+          sno: tableData.length + 1,
+          name: this.getActionToName(users.firstname ?users.firstname + " " + users.lastname : '', users._id),
+          //name: users.firstname + " " + users.lastname,
+          email: users.email,
+          username: users.username,
+          status: users.status ? 'Active' : 'Inactive',
+          //actions: this.getActions(users.status, users._id)
+        }
+        if (this.state.deleted !== users.status) {
+          tableData.push(data);
+        }
+      });
+    }
+    return (
+      <div>
+        <Sidebar {...this.props} />
+        <div className="wrapper">
+          <Header />
+          <div className="users">
+            <div className="container-fluid">
+              <div className="row">
+                {alert.message &&
+                  <div className="col-12"><div className={`alert ${alert.type}`}>{alert.message}</div></div>
+                }
+                {users.loading && <em>Loading users...</em>}
+                {users.error && <span className="text-danger">ERROR: {users.error}</span>}
+              </div>
+              <div className="row">
+                <div className="col-sm-10 col-12">
+                  <h3>Admin Users</h3>
+                </div>
+                {/* <div className="col-sm-3 col-6 d-flex justify-content-start justify-content-sm-end align-items-center mt-1 mt-sm-0">
+                  <select class="form-control" value={this.state.deleted} onChange={(e) => this.setState({ deleted: !this.state.deleted })}>
+                    <option value={false}>Active</option>
+                    <option value={true}>Inactive</option>
+                  </select>
+                </div> */}
+                <div className="col-sm-2 col-6 d-flex justify-content-end justify-content-sm-end align-items-center mt-1 mt-sm-0">
+                  <Link to="/adduser" className="btn w-100 btn-outline-success editBtn  font-weight-normal">ADD NEW ADMIN</Link>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="content my-3 shadow bg-white table-responsive dataTables">
+                    <DataTable className="table table-stripped table-bordered"
+                      title=""
+                      columns={columns}
+                      data={tableData}
+                      pagination
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function mapState(state) {
+  const { users, alert } = state;
+  return { users, alert };
+
+}
+
+const actionCreators = {
+  getUsers: userActions.getAll,
+  editUser: userActions.editUser,
+  deleteUser: userActions.deleteUser,
+  activateUser: userActions.activate
+}
+
+const connectedUsersPage = connect(mapState, actionCreators)(UsersPage);
+export { connectedUsersPage as UsersPage };

@@ -1,0 +1,225 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { deviceActions, businessActions } from '../_actions';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Header } from '../Header/Header';
+import DataTable from 'react-data-table-component';
+
+class DevicePage extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      searchText: '',
+      debounce: null,
+      customers: [],
+      main: [],
+      customer: null,
+      deleted: false,
+      initial: false
+    }
+  }
+
+  componentDidMount() {
+    const { user } = this.props.authentication;
+    const authUser = user;
+    if (authUser && authUser.role == 'businessOwner') {
+      this.props.getBusiness(authUser._id).then(business => {
+        this.setState({ initial: true });
+        this.props.getAllCustomers(business.data[0]._id)
+      });
+    } else {
+      this.setState({ initial: true });
+      this.props.getAllCustomers('all')
+    }
+  }
+
+  // searchText = (text) => {
+  //   let { searchText, debounce } = this.state;
+  //   searchText = text;
+  //   let customers = this.state.main.filter(item => item.firstname && item.firstname.toLowerCase().includes(text.toLowerCase()));
+  //   this.setState({ searchText, debounce, customers });
+  // }
+
+  handleDeleteCustomer(e, id) {
+    e.preventDefault();
+    this.props.deleteCustomer(id);
+  }
+
+  handleActivateCustomer(e, id) {
+    e.preventDefault();
+    const customer = {};
+    customer._id = id;
+    customer.status = true;
+    this.props.activateCustomer(customer);
+  }
+
+  getActions(status, customer_id) {
+    return <div> <Link to={{ pathname: `editdevice/${customer_id}` }} className=""><i className="fa fa-edit fa-fw"></i></Link>
+      {status ?
+        <Link to="/" className="" onClick={e => this.handleDeleteCustomer(e, customer_id)} ><i className="fa fa-check fa-fw"></i></Link>
+        :
+        <Link to="/" className="" onClick={e => this.handleActivateCustomer(e, customer_id)} ><i className="fa fa-remove fa-fw"></i></Link>
+      } </div>
+  }
+
+  getActivityStatus = (activity) => {
+    if (activity == 'online') {
+      return <span style={{ color: '#43cc43' }}>{activity}</span>
+    } else if (activity == 'disable') {
+      return <span style={{ color: '#daab02' }}>{activity}</span>
+    } else {
+      return <span style={{ color: 'red' }}>{activity}</span>
+    }
+  }
+
+  render() {
+    const { customer, alert } = this.props;
+    const columns = [
+      {
+        name: '#',
+        selector: 'sno',
+        grow: 0,
+      },
+      {
+        name: 'Device Name',
+        selector: 'name',
+        grow: 1
+      },
+      {
+        name: 'Business',
+        selector: 'business',
+        grow: 1
+      },
+      {
+        name: 'Serial Number',
+        selector: 'snumber'
+      },
+      {
+        name: 'Area Name',
+        selector: 'areaname'
+      },
+      {
+        name: 'Commnication Type',
+        selector: 'comtype'
+      },
+      {
+        name: 'Network Connection Mode',
+        selector: 'conmode'
+      },
+      {
+        name: 'IP Address',
+        selector: 'ipaddress'
+      },
+      {
+        name: 'RS485 Parameter',
+        selector: 'parameter'
+      },
+      {
+        name: 'Status',
+        selector: 'status'
+      },
+      {
+        name: 'Device Model',
+        selector: 'model'
+      },
+      {
+        name: 'Firmware Version',
+        selector: 'version'
+      },
+      {
+        name: 'Actions',
+        selector: 'actions',
+        right: true
+      }
+    ];
+    
+    let tableData = [];
+    if (customer && customer.length && this.state.initial) {
+      customer.forEach((cust, index) => {
+        const data = {
+          sno: tableData.length + 1,
+          name: cust.name,
+          business: cust.business[0].business_name,
+          snumber: cust.serial,
+          areaname: cust.area,
+          comtype: cust.communicationtype,
+          conmode: cust.connectionmode,
+          ipaddress: cust.ipaddress,
+          parameter: cust.parameter,
+          status: this.getActivityStatus(cust.activitystatus),
+          model: cust.model,
+          version: cust.version,
+          actions: this.getActions(cust.status, cust._id)
+        }
+        if (this.state.deleted !== cust.status) {
+          tableData.push(data);
+        }
+      });
+    }
+    return (
+      <div>
+        <Sidebar {...this.props} />
+        <div className="wrapper">
+          <Header />
+          <div className="users">
+            <div className="container-fluid">
+              <div className="row">
+                {alert.message &&
+                  <div className="col-12 mt-3"><div className={`alert ${alert.type}`}>{alert.message}</div></div>
+                }
+              </div>
+              <div className="row">
+                <div className="col-sm-9 col-12">
+                  <h3>Devices</h3>
+                </div>
+                {/* <div className="col-sm-3 col-6 d-flex justify-content-start justify-content-sm-end align-items-center mt-1 mt-sm-0">
+                  <select className="form-control" value={this.state.deleted} onChange={(e) => this.setState({ deleted: !this.state.deleted })}>
+                    <option value={false}>Active</option>
+                    <option value={true}>Inactive</option>
+                  </select>
+                </div> */}
+                <div className="col-sm-3 col-6 d-flex justify-content-start justify-content-sm-end align-items-center mt-1 mt-sm-0">
+                  <Link to="/adddevice" className="btn w-100 btn-success editBtn text-white font-weight-normal">ADD NEW DEVICE</Link>
+                </div>
+                {/* <div className="col-sm-1 col-12 d-flex justify-content-end align-items-center">
+                  <Link to="/business" className=""><i className="fa fa-arrow-circle-left fa-fw"></i></Link>
+                </div> */}
+              </div>
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="content my-3 shadow bg-white table-responsive dataTables">
+                    <DataTable className="table table-stripped table-bordered"
+                      title=""
+                      columns={columns}
+                      data={tableData}
+                      pagination
+                      paginationPerPage={25}
+                      paginationRowsPerPageOptions={[25,50,100]}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function mapState(state) {
+  const { device, alert, authentication } = state;
+  let customer = device.items;
+  return { customer, alert, authentication };
+}
+
+const actionCreators = {
+  getAllCustomers: deviceActions.getAllDevices,
+  deleteCustomer: deviceActions.deleteDevice,
+  activateCustomer: deviceActions.activate,
+  getBusiness: businessActions.getAllBusiness
+}
+
+const connectedDevicePage = connect(mapState, actionCreators)(DevicePage);
+export { connectedDevicePage as DevicePage };

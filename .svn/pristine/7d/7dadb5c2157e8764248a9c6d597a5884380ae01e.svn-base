@@ -1,0 +1,304 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { businessActions, userActions, commonActions } from '../_actions';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Header } from '../Header/Header';
+import AddLocation from './addLocation';
+import Table from 'react-bootstrap/Table';
+import Form from 'react-bootstrap/Form';
+import Button from 'react-bootstrap/Button';
+
+class AddBusinessPage extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      business: {
+        firstname: '',
+        lastname: '',
+        email: '',
+        password: '',
+        business_name: '',
+        status: true
+      },
+      businessLocation: [{
+        name: "",
+        address: "",
+        city: "",
+        state: "",
+        country: "",
+        postalcode: "",
+        status: true
+      }],
+      submitted: false,
+      invalid: false,
+      mail: true
+    }
+
+
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+
+  }
+
+  componentDidMount() {
+    //this.props.businessUserList();
+    this.props.countriesList();
+  }
+
+  //...state...
+  addLocation = (e) => {
+    this.setState((prevState) => ({
+      businessLocation: [...prevState.businessLocation, { name: "", city: "", state: "", country: "", address: "", postalcode: "", status: true }],
+    }));
+  }
+
+  removeLocation = (e) => {
+    const locationId = e.target.dataset.id;
+    let businessLocation = [...this.state.businessLocation];
+    businessLocation.splice(locationId, 1);
+    this.setState({ businessLocation });
+  }
+
+  ValidateEmail = (mail) => {
+    if (/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(mail)) {
+      return (true)
+    }
+    return (false)
+  }
+
+  handleChange = (e) => {
+    const { name, value } = event.target;
+    const { business } = this.state;
+    if (["name", "address", "city", "country", "state", "postalcode"].includes(e.target.dataset.fieldname)) {
+      let businessLocation = [...this.state.businessLocation];
+      if (name == 'country-' + e.target.dataset.id) {
+        console.log('------------------------------this is called on change of country ' + e.target.dataset.id)
+        this.props.regionsListForLocations(value, e.target.dataset.id);
+      }
+      businessLocation[e.target.dataset.id][e.target.dataset.fieldname] = e.target.value;
+      this.setState({ businessLocation });
+
+    } else {
+      if (name == 'email') {
+        this.ValidateEmail(value) ? this.setState({ mail: true }) : this.setState({ mail: false });
+      }
+      this.setState({
+        business: {
+          ...business,
+          [name]: value
+        }
+      });
+    }
+  }
+
+  checklocations = () => {
+    let result = true;
+    this.state.businessLocation.forEach((loc) => {
+      Object.keys(loc).forEach(function (key) {
+        if (loc[key] == '') {
+          result = false;
+        }
+      });
+    });
+    return result;
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    this.setState({ submitted: true, invalid: false });
+    const { user } = this.props.authentication;
+    const authUser = user;
+    const submitData = this.state;
+    const { business } = this.state;
+    business['username'] = business.email;
+    this.setState({ business }, () => {
+      if (authUser && authUser.role == 'businessOwner') {
+        if (business.business_name !== '' && this.checklocations()) {
+          this.props.newBusiness(this.state, { data: authUser });
+        } else {
+          this.setState({ invalid: true });
+        }
+      } else {
+        if (business.business_name !== '' && business.firstname !== '' && business.lastname !== '' && business.email !== '' && this.checklocations() && this.state.mail) {
+          business.role = 'businessOwner';
+          this.props.newBusiness(this.state);
+        } else {
+          this.setState({ invalid: true });
+        }
+      }
+    });
+  }
+
+
+  render() {
+    const { adding, alert, users, countries, regions, authentication } = this.props;
+    const { business, submitted, businessLocation } = this.state;
+    const { user } = authentication;
+    const authUser = user;
+    const states = this.props;
+    return (
+      <div>
+        <Sidebar {...this.props} />
+        <div className="wrapper">
+          <Header />
+          <div className="addbusiness my-4">
+            <div className="container-fluid">
+              <div className="addbusiness my-3">
+                <div className="container-fluid">
+                  <div className="row">
+                    {alert.message &&
+                      <div className="col-12"><div className={`alert ${alert.type}`}>{alert.message}</div></div>
+                    }
+                  </div>
+                  <div className="row mb-3">
+                    <div className="col-9">
+                      <h3>Add New Business</h3>
+                    </div>
+                    <div className="col-3 d-flex justify-content-end align-items-center">
+                      <Link to="/business" className=""><i class="fa fa-arrow-circle-left fa-fw"></i></Link>
+                    </div>
+                  </div>
+                  <Form name="business" onSubmit={this.handleSubmit}>
+                    {authUser && authUser.role !== 'businessOwner' ? <div className="row">
+                      <div className="col-12">
+                        <div className="card shadow">
+                          <div className="card-body">
+                            <h3>Owner</h3>
+                            <div className="row">
+                              <div className="col-md-6 col-sm-6 col-12 pl-0 pl-sm-3 pr-0">
+                                <Form.Group controlId="formBasicEmail">
+                                  <Form.Label>First Name <span className="text-danger">*</span></Form.Label>
+                                  <Form.Control type="text" name="firstname" value={business.firstname} onChange={this.handleChange} placeholder="Enter first name" />
+                                  <Form.Text className="text-muted">
+                                  </Form.Text>
+                                </Form.Group>
+                              </div>
+                              <div className="col-md-6 col-sm-6 col-12 pl-0 pl-sm-3 pr-0">
+                                <Form.Group controlId="formBasicEmail">
+                                  <Form.Label>Last Name <span className="text-danger">*</span></Form.Label>
+                                  <Form.Control type="text" name="lastname" value={business.lastname} onChange={this.handleChange} placeholder="Enter last name" />
+                                  <Form.Text className="text-muted">
+                                  </Form.Text>
+                                </Form.Group>
+                              </div>
+                              <div className="col-md-6 col-sm-6 col-12 pl-0 pl-sm-3 pr-0">
+                                <Form.Group controlId="formBasicEmail">
+                                  <Form.Label>Email <span className="text-danger">*</span></Form.Label>
+                                  <Form.Control type="text" name="email" value={business.email} onChange={this.handleChange} placeholder="Enter email" />
+                                  {!this.state.mail ? <span style={{ color: 'red', fontSize: '12px' }}>Please enter a valid email</span> : null}
+                                  <Form.Text className="text-muted">
+                                  </Form.Text>
+                                </Form.Group>
+                              </div>
+                              <div className="col-md-6 col-sm-6 col-12 pl-0 pl-sm-3 pr-0">
+                                <Form.Group controlId="formBasicEmail">
+                                  <Form.Label>Password <span className="text-danger">*</span></Form.Label>
+                                  <Form.Control type="password" name="password" value={business.password} onChange={this.handleChange} placeholder="Enter password" />
+                                  <Form.Text className="text-muted">
+                                  </Form.Text>
+                                </Form.Group>
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
+                      </div>
+                    </div> : null}
+                    <div className="row my-3">
+                      <div className="col-12">
+                        <div className="card shadow">
+                          <div className="card-body">
+                            <div className="row">
+                              <div className="col-md-6 col-sm-7 col-12 pl-0">
+                                <h3>Business</h3>
+                              </div>
+                              <div className="col-md-12 col-sm-12 col-12 pl-0 pl-sm-3 pr-0">
+                                <Form.Group controlId="formBasicEmail">
+                                  <Form.Label>Business name <span className="text-danger">*</span></Form.Label>
+                                  <Form.Control type="text" name="business_name" value={business.business_name} onChange={this.handleChange} placeholder="Enter business name" />
+                                  <Form.Text className="text-muted">
+                                  </Form.Text>
+                                </Form.Group>
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="row my-3">
+                      <div className="col-12">
+                        <div className="card shadow">
+                          <div className="card-body">
+                            <div className="row">
+                              <div className="col-md-6 col-sm-7 col-12 pl-0">
+                                <h3>Locations</h3>
+                              </div>
+                              <div class="col-md-6 col-sm-5 col-12 d-flex justify-content-start justify-content-sm-end pr-0 pl-sm-3 pl-0 mt-1 mt-sm-0">
+                                <button type="button" class="customBtn float-right btn btn-primary" onClick={this.addLocation}>Add More Locations</button></div>
+                            </div>
+                            {
+                              businessLocation.map((val, idx) => {
+                                return (
+                                  <AddLocation
+                                    {...this.props}
+                                    idx={idx}
+                                    val={val}
+                                    handleChange={this.handleChange}
+                                    removeLocation={this.removeLocation}
+                                    businessLocation={businessLocation}
+                                  />
+                                )
+                              })
+                            }
+                            <div className="row">
+                              <div className="col-12 p-0 d-flex flex-wrap justify-content-start border-top pt-3">
+                                <Button variant="primary" className="customBtn customPadding" type="submit">
+                                  Add Business
+                                              {adding &&
+                                    <img src="data:image/gif;base64,R0lGODlhEAAQAPIAAP///wAAAMLCwkJCQgAAAGJiYoKCgpKSkiH/C05FVFNDQVBFMi4wAwEAAAAh/hpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh+QQJCgAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa+dIAAAh+QQJCgAAACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkECQoAAAAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkECQoAAAAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo/IpHI5TAAAIfkECQoAAAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo/IpFKSAAAh+QQJCgAAACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh+QQJCgAAACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAkKAAAALAAAAAAQABAAAAMyCLrc/jDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA==" />
+                                  }
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="row">
+                            {this.state.invalid ?
+                              <div className="col-12"><div className={`alert alert-danger`}>Please fill all fields</div></div> : null
+                            }
+                          </div>
+                        </div></div>
+                    </div>
+                  </Form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function mapState(state) {
+  const { adding } = state.business;
+  const { alert, users, authentication } = state;
+  const { countries, regions } = state.common;
+  //console.log("I am state=======", state);
+  return { adding, alert, users, countries, regions, authentication };
+
+}
+
+const actionCreators = {
+  businessUserList: userActions.getAll,
+  countriesList: commonActions.getCountries,
+  regionsListForLocations: commonActions.getRegionsForLocations,
+  newBusiness: businessActions.newbusiness,
+  returnCountries: commonActions.returnCountries,
+  returnRegions: commonActions.returnRegions
+}
+
+const connectedAddBusinessPage = connect(mapState, actionCreators)(AddBusinessPage);
+export { connectedAddBusinessPage as AddBusinessPage };

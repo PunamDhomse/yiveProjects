@@ -1,0 +1,271 @@
+// Import user model
+User = require('../models/userModel');
+Business = require("../models/businessModel.js");
+jwt = require('jsonwebtoken');
+bcrypt = require('bcryptjs');
+config = require('../config.json');
+const mailer = require('../helpers/sendMail');
+let mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
+// Handle index actions
+exports.index = function (req, res) {
+    User.get(function (err, users) {
+        if (err) {
+            res.json({
+                status: "error",
+                message: err
+            });
+        }
+        res.json({
+            status: "success",
+            message: "Users Info successfully recieved",
+            data: users
+        });
+
+    });
+};
+
+exports.forgetPassword = function (req, res) {
+    User.find({ email: req.body.email }).then(user => {
+        let password = Math.random().toString(36).substring(7);
+        let final = password;
+        password = bcrypt.hashSync(password, 10);
+        User.updateOne({ _id: user[0]._id }, { password: password }).then(() => {
+            let mailObj = {
+                to: user[0].email,
+                subject: 'Yive Team',
+                text: `Your username is ${user[0].username ? user[0].username : user[0].email} and your new password is ${final}`
+            };
+            mailer.sendMail(mailObj);
+            return res.json({
+                message: 'Email sent successfully.'
+            });
+        }).catch(err => {
+            res.status(500).json({
+                status: "error",
+                message: err
+            });
+        });
+    }).catch(err => {
+        res.status(500).json({
+            status: "error",
+            message: err
+        });
+    });
+};
+
+exports.getalladmin = function (req, res) {
+    User.find({ role: 'admin' }, function (err, users) {
+        if (err) {
+            res.json({
+                status: "error",
+                message: err
+            });
+        }
+        res.json({
+            status: "success",
+            message: "Users Info successfully recieved",
+            data: users
+        });
+
+    });
+};
+
+
+function authenticate(req, res) {
+    let username = req.body.username;
+    let password = req.body.password;
+    if (username && password) {
+        User.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { role: { $ne: 'customer' }, status: true },
+                        {
+                            $or: [{ username: username.toLowerCase() }, { email: username.toLowerCase() }]
+                        }
+                    ]
+                }
+            },
+            {
+                $lookup:
+                {
+                    from: 'user_profiles',
+                    localField: '_id',
+                    foreignField: 'user_id',
+                    as: 'userprofileData'
+                }
+            }
+        ], async function (err, user) {
+            if (err) {
+                res.status(500);
+                res.json(err);
+            } else if (user[0] && bcrypt.compareSync(password, user[0].password)) {
+                user = user[0];
+                if (user.userprofileData[0]) {
+                    user.userprofileData = user.userprofileData[0];
+                }
+                let business = null;
+                if (user.role == 'businessOwner') {
+                    business = await Business.findOne({ business_owner_id: user._id, status: true });
+                } else if (user.role == 'businessManager' || user.role == 'locationManager') {
+                    business = await Business.findOne({ business_owner_id: user.userprofileData.business_owner_id, status: true });
+                }
+                if (business || !['businessOwner', 'businessManager', 'locationManager'].includes(user.role)) {
+                    // const { password, ...userWithoutPassword } = user.toObject();
+                    delete user.password;
+                    const token = jwt.sign({ sub: user._id }, config.secret);
+                    user['token'] = token;
+                    res.send(user);
+                } else {
+                    res.status(500);
+                    res.json({ message: 'You are not allowed to login.' });
+                }
+            } else {
+                res.status(500);
+                res.json({ message: 'Wrong username or password' });
+            }
+        });
+    } else {
+        res.status(500);
+        res.json('username & password are required');
+    }
+}
+module.exports.authenticate = authenticate;
+// Handle create New USER Info
+exports.new = async function (req, res) {
+    let user = req.body;
+    var userinfo = {};
+    let email = req.body.email;
+    let username = req.body.username;
+    //console.log(userinfo);.toLowerCase()
+    userinfo['firstname'] = req.body.firstname;
+    userinfo['lastname'] = req.body.lastname;
+    userinfo['email'] = email.toLowerCase();
+    userinfo['username'] = username.toLowerCase();
+    let password = req.body.password ? req.body.password : Math.random().toString(36).substring(7);
+    userinfo['password'] = bcrypt.hashSync(password, 10);
+    userinfo['role'] = req.body.role;
+    if (userinfo['role'] !== 'customer') {
+        let usersWithEmail = await User.find({ email: userinfo['email'] });
+        if (usersWithEmail.length > 0) {
+            res.status(500);
+            return res.json({ message: 'Email already exists.' });
+        }
+    }
+    User.create(userinfo, (err, created) => {
+        if (err) {
+            res.status(500);
+            res.json(err);
+        } else {
+            if (user.role == 'admin') {
+                let mailObj = {
+                    to: user.email,
+                    subject: 'Yive Team',
+                    text: `Congratulations you are now admin of Yive. Your username is ${user.username} and password is ${user.password}`
+                };
+                mailer.sendMail(mailObj);
+            }
+            res.json({
+                message: 'New user created!',
+                data: created
+            });
+        }
+    });
+};
+
+//Handle update User info
+exports.update = function (req, res) {
+    console.log('userid in request is', req.body);
+    User.findById(req.params.user_id, function (err, user) {
+        if (err) {
+            res.status(500);
+            return res.send(err);
+        }
+        else {
+            //console.log('db user record', user);
+            let email = req.body.email ? req.body.email : user.email;
+            let username = req.body.username ? req.body.username : user.username;
+            user.firstname = req.body.firstname ? req.body.firstname : user.firstname;
+            user.lastname = req.body.lastname ? req.body.lastname : user.lastname;
+            user.username = username.toLowerCase();
+            user.password = req.body.password ? bcrypt.hashSync(req.body.password, 10) : user.password;
+            user.email = email.toLowerCase();
+            user.role = req.body.role ? req.body.role : user.role;
+            user.status = req.body.status ? req.body.status : user.status;
+            console.log("Update User", user);
+            user.save(function (err) {
+                if (err) {
+                    res.status(500)
+                    res.json(err);
+                } else {
+                    res.json({
+                        message: 'User Info updated',
+                        data: user
+                    });
+                }
+            });
+        }
+    });
+};
+
+exports.view = function (req, res) {
+    User.findById(req.params.user_id, function (err, user) {
+        if (err) {
+            res.status(500);
+            res.json(err);
+        }
+        else {
+            res.json({
+                message: 'User Info updated',
+                data: user
+            });
+        }
+    });
+};
+
+//USER PROFILE API
+exports.profile = function (req, res) {
+    console.log(req.params.user_id);
+    User.aggregate([
+        { $match: { "_id": ObjectId(req.params.user_id) } },
+        {
+            $lookup:
+            {
+                from: 'user_profiles',
+                localField: '_id',
+                foreignField: 'user_id',
+                as: 'userprofileData'
+            }
+        }
+    ], function (err, userdata) {
+        if (err) {
+            res.status(500);
+            res.json(err);
+        }
+        else {
+            res.json({
+                message: 'User Info updated',
+                data: userdata[0]
+            });
+        }
+    });
+};
+
+// Handle delete User
+exports.delete = function (req, res) {
+    // for update multiple value use this: var newvalues = { $set: { } };
+    var newvalue = { status: "0" };
+    User.updateOne({ _id: req.params.user_id }, newvalue, function (err, user) {
+        if (err) {
+            res.status(500)
+            res.send(err);
+        }
+        else {
+            res.json({
+                status: "success",
+                message: 'User deleted'
+            });
+        }
+    });
+};

@@ -1,0 +1,497 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { connect } from 'react-redux';
+import { customerActions, businessActions } from '../_actions';
+import { customerService } from '../_services';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { Header } from '../Header/Header';
+import { MultiSelectComponent, DropDownListComponent } from '@syncfusion/ej2-react-dropdowns';
+import Table from 'react-bootstrap/Table';
+import Button from 'react-bootstrap/Button';
+import moment from 'moment';
+import Autocomplete from 'react-autocomplete';
+import Form from 'react-bootstrap/Form';
+import DataTable from 'react-data-table-component';
+import { DateRangePicker, DateRange } from 'react-date-range';
+
+const endDateVal = new Date();
+const startDateVal = new Date().setMonth(endDateVal.getMonth() - 1);
+const startDateNew = new Date(startDateVal);
+
+class ReportPage extends React.Component {
+
+  constructor(props) {
+    super(props);
+    this.dateOpen = this.dateOpen.bind(this);
+    this.formatDateDisplay = this.formatDateDisplay.bind(this);
+    this.handlePreviewChange = this.handlePreviewChange.bind(this);
+  }
+
+  state = {
+    dateClick: 'close',
+    rangeClick: '',
+    autoValue: '',
+    // startDate: new Date(),
+    dateRangePicker: {
+      selection: {
+        startDate: startDateNew,
+        endDate: endDateVal,
+        key: 'selection',
+      },
+    },
+    dateRange: {
+      selection: {
+        startDate: startDateNew,
+        endDate: endDateVal,
+        key: 'selection',
+      },
+    },
+    dateToFilter: {
+      selection: {
+        startDate: startDateNew,
+        endDate: endDateVal,
+        key: 'selection',
+      },
+    },
+    tableData: [],
+    filters: {
+      business_id: '',
+      _id: ''
+    }
+  };
+
+
+  componentWillMount() {
+    const { user } = this.props.authentication;
+    const authUser = user;
+    if (authUser && authUser.role == 'businessOwner') {
+      this.props.getBusiness(authUser._id);
+      this.loadData({}, null, 'business_owner_id', authUser._id);
+    } else if (authUser && authUser.role == 'businessManager') {
+      this.props.getBusiness(authUser.userprofileData.business_owner_id);
+      this.loadData({}, null, 'business_owner_id', authUser.userprofileData.business_owner_id);
+    } else if (authUser && authUser.role == 'locationManager') {
+      this.props.history.push(`/visitor/${authUser.userprofileData.location_id}/${authUser.userprofileData.business_id}`);
+    } else {
+      this.props.getBusiness();
+      this.loadData({}, { start: this.startDateVal, end: this.endDateVal }, 'all', '');
+    }
+  }
+
+  loadData(filters = {}, date = null, getBy = 'all', byId = '') {
+    customerService.getAllReports(filters, date, getBy, byId).then(res => {
+      this.setState({ tableData: res.data });
+    }).catch(err => {
+      this.setState({ tableData: [] });
+    });
+  }
+
+  clearFilters() {
+    const { user } = this.props.authentication;
+    const authUser = user;
+    this.setState({
+      filters: { business_id: '', _id: '' },
+      autoValue: '',
+      dateRangePicker: {
+        selection: {
+          startDate: new Date(),
+          endDate: new Date(),
+          key: 'selection'
+        },
+      },
+      dateRange: {
+        selection: {
+          startDate: new Date(),
+          endDate: new Date(),
+          key: 'selection'
+        }
+      },
+      dateToFilter: {
+        selection: {
+          startDate: null,
+          endDate: null,
+          key: 'selection'
+        }
+      }
+    });
+    if (authUser && authUser.role == 'businessOwner') {
+      this.loadData({}, null, 'business_owner_id', authUser._id);
+    } else if (authUser && authUser.role == 'businessManager') {
+      this.loadData({}, null, 'business_owner_id', authUser.userprofileData.business_owner_id);
+    } else {
+      this.loadData();
+    }
+  }
+
+  handleChange(event, props) {
+    const { user } = props.authentication;
+    const authUser = user;
+    const { name, value } = event.target;
+    let data = this.state.filters;
+    let date = null;
+    if (name == 'business_id') {
+      data['business_id'] = value;
+      delete data._id;
+      if (value == '')
+        delete data.business_id;
+      props.getBusinessLocations(value);
+    }
+    if (name == 'location_id') {
+      data['_id'] = value;
+      if (value == '')
+        delete data._id;
+    }
+    if (this.state.dateToFilter.selection.endDate !== null && this.state.dateToFilter.selection.startDate !== null) {
+      date = { start: this.state.dateToFilter.selection.startDate, end: this.state.dateToFilter.selection.endDate }
+    }
+    if (authUser && authUser.role == 'businessOwner') {
+      this.loadData(data, date, 'business_owner_id', authUser._id);
+    } else if (authUser && authUser.role == 'businessManager') {
+      this.loadData(data, date, 'business_owner_id', authUser.userprofileData.business_owner_id);
+    } else {
+      this.loadData(data, date);
+    }
+    data['business_id'] = data['business_id'] ? data['business_id'] : '';
+    data['_id'] = data['_id'] ? data['_id'] : '';
+    this.setState({ filters: data });
+  }
+
+  handleRangeChange(which, payload) {
+    const { user } = this.props.authentication;
+    const authUser = user;
+    let filters = this.state.filters;
+    filters['business_id'] == '' ? delete filters.business_id : null;
+    filters['_id'] == '' ? delete filters._id : null;
+    this.setState({
+      [which]: {
+        ...this.state[which],
+        ...payload,
+      },
+      dateToFilter: payload
+    });
+
+
+    if (which == 'dateRangePicker') {
+
+      if (this.state.dateRangePicker.selection.startDate == this.state.dateRangePicker.selection.endDate || this.state.rangeClick == 'staticRanges' || this.state.rangeClick == 'inputRanges') {
+        this.setState({ dateClick: 'close' });
+        let date = {
+          start: payload.selection.startDate,
+          end: payload.selection.endDate
+        }
+        if (authUser && authUser.role == 'businessOwner') {
+          this.loadData(filters, date, 'business_owner_id', authUser._id);
+        } else if (authUser && authUser.role == 'businessManager') {
+          this.loadData(filters, date, 'business_owner_id', authUser.userprofileData.business_owner_id);
+        } else {
+          this.loadData(filters, date);
+        }
+      }
+    } else {
+      // console.log(this.state.dateRange.selection.startDate == this.state.dateRange.selection.endDate);
+      if (this.state.dateRange.selection.startDate == this.state.dateRange.selection.endDate) {
+        let date = {
+          start: payload.selection.startDate,
+          end: payload.selection.endDate
+        }
+        if (authUser && authUser.role == 'businessOwner') {
+          this.loadData(filters, date, 'business_owner_id', authUser._id);
+        } else if (authUser && authUser.role == 'businessManager') {
+          this.loadData(filters, date, 'business_owner_id', authUser.userprofileData.business_owner_id);
+        } else {
+          this.loadData(filters, date);
+        }
+        this.setState({ dateClick: 'close' });
+      }
+    }
+  }
+
+  handlePreviewChange(value) {
+    if (value != undefined) {
+      if (value.startDate != undefined) {
+        this.setState({ rangeClick: 'staticRanges' });
+      } else {
+        this.setState({ rangeClick: '' });
+      }
+    } else {
+      this.setState({ rangeClick: 'inputRanges' });
+    }
+  }
+
+  formatDateDisplay(date, defaultText) {
+    if (!date) return defaultText;
+    return new Date(date).toLocaleDateString('en-US');
+  }
+
+  dateOpen() {
+    if (this.state.dateClick == 'close') {
+      this.setState({ dateClick: '' });
+    } else {
+      this.setState({ dateClick: 'close' });
+    }
+  }
+
+  getViewButton = (location) => {
+    let query = '';
+    let dateState = this.state.dateToFilter.selection;
+    if (dateState.startDate !== null && dateState.endDate !== null) {
+      query = `?start=${moment(dateState.startDate).unix()}&end=${moment(dateState.endDate).unix()}`
+    }
+    return <input type="button" className="btn btn-success btn-sm" value="View" onClick={() => this.props.history.push(`/visitor/${location._id}/${location.business_id}${query}`)} />
+  }
+
+  findSelected = (value) => {
+    let selected = this.props.business.items.filter(elem => elem.business_name == value);
+    selected = selected[0]._id;
+    let event = {
+      target: {
+        name: 'business_id',
+        value: selected
+      }
+    }
+    this.handleChange(event, this.props);
+  }
+
+
+  sports = ["Baseball", "Basketball", "Cricket", "Field Hockey", "Football", "Table Tennis", "Tennis", "Volleyball"];
+
+  render() {
+    const { alert, business, authentication } = this.props;
+    const { user } = authentication;
+    const { businessLocation } = business;
+    const authUser = user;
+
+    const columns = [
+      {
+        name: '#',
+        selector: 'sno',
+        sortable: true,
+        grow: 0,
+      },
+      {
+        name: 'Business ',
+        selector: 'business',
+        sortable: true,
+        grow: 1
+      },
+      {
+        name: 'Name',
+        selector: 'name',
+        sortable: true,
+        grow: 1
+      },
+      {
+        name: 'Location',
+        selector: 'location',
+        sortable: true
+      },
+      {
+        name: 'Total Visitor',
+        selector: 'visitor',
+        sortable: true,
+        center: true
+
+      },
+      {
+        name: 'Visitors',
+        selector: 'view',
+        right: true,
+
+      }
+    ];
+    let autoComplete = [];
+    if (business.items && business.items.length) {
+      autoComplete = business.items.map(elem => {
+        return { label: elem.business_name, _id: elem._id }
+      });
+    }
+    let tableData = this.state.tableData.map((location, i) => {
+      let data = {
+        sno: i + 1,
+        business: location.businessData.business_name,
+        name: location.user[0].firstname + " " + location.user[0].lastname,
+        location: location.name,
+        visitor: location.visitorData.length,
+        view: this.getViewButton(location)
+      }
+      return data;
+    });
+
+    return (
+      <div>
+        <Sidebar {...this.props} />
+        <div className="wrapper">
+          <Header />
+          {authUser && authUser.role !== 'locationManager' ? <div className="users">
+            <div className="container-fluid">
+              <div className="row">
+                {alert.message &&
+                  <div className={`alert ${alert.type}`}>{alert.message}</div>
+                }
+              </div>
+              <div className="row">
+                <div className="col-6">
+                  <h3>Report List</h3>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="content my-3 shadow bg-white">
+                    <div id="multisection" className='control-section'>
+                      <div id="multidefault">
+                        <div className="control-styles">
+                          <div className="row py-3">
+                            <div className="col-md-3 col-sm-3 col-6 multiSelect">
+                              {/* <Autocomplete
+                                getItemValue={(item) => item.label}
+                                items={autoComplete}
+                                shouldItemRender={(item, value) => item.label.toLowerCase().indexOf(value.toLowerCase()) > -1}
+                                renderItem={(item, isHighlighted) =>
+                                  <div>
+                                    {item.label}
+                                  </div>
+                                }
+                                inputProps={{
+                                  style: {
+                                    display: 'block',
+                                    width: '100%',
+                                    height: 'calc(1.5em + .75rem + 2px)',
+                                    padding: '.375rem .75rem',
+                                    fontSize: '1rem',
+                                    fontWeight: 400,
+                                    lineHeight: 1.5,
+                                    color: '#495057',
+                                    backgroundColor: '#fff',
+                                    backgroundClip: ' padding-box',
+                                    border: '1px solid #ced4da',
+                                    borderRadius: '.25rem'
+                                  }
+                                }}
+                                value={this.state.autoValue}
+                                onChange={(e) => this.setState({ autoValue: e.target.value })}
+                                onSelect={(val) => { this.setState({ autoValue: val }); this.findSelected(val) }}
+                              /> */}
+                              {<Form.Group controlId="exampleForm.ControlSelect1">
+                                <Form.Control value={this.state.filters.business_id} name="business_id" as="select" onChange={(e) => this.handleChange(e, this.props)}>
+                                  <option value={''}>Select business</option>
+                                  {business.items && business.items.length &&
+                                    business.items.map((business, index) =>
+                                      <option value={business._id}>{business.business_name}</option>
+                                    )};
+                                              </Form.Control>
+                              </Form.Group>}
+                              {/* <DropDownListComponent id="ddlelement" dataSource={sportsData} mode="Box" fields={fields} placeholder="Select Business"/> */}
+                            </div>
+                            <div className="col-md-3 col-sm-3 col-6 multiSelect">
+                              <Form.Group controlId="exampleForm.ControlSelect1">
+                                {/* <Form.Label>Location</Form.Label> */}
+                                <Form.Control value={this.state.filters._id} name="location_id" as="select" onChange={(e) => this.handleChange(e, this.props)}>
+                                  <option value={''}>Select Location</option>
+                                  {businessLocation && businessLocation.length &&
+                                    businessLocation.map((business, index) =>
+                                      <option value={business._id}>{business.name}</option>
+                                    )};
+                                              </Form.Control>
+                              </Form.Group>
+                              {/* <DropDownListComponent id="ddlelement" dataSource={sportsData} mode="Box" fields={fields} placeholder="Select Name"/> */}
+                            </div>
+                            <div style={{ paddingTop: '5px' }} className="col-md-2 col-sm-2 col-6 multiSelect text-left">
+                              <a onClick={() => this.clearFilters()} href="javascript:void(0)">&#x2716; Clear Filters</a>
+                            </div>
+                            <div className="col-md-4 col-sm-4 col-6 dateFilter">
+                              <div className="filters d-md-block d-sm-none d-none">
+                                <div className="input">
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value={this.formatDateDisplay(this.state.dateToFilter.selection.startDate)}
+                                  />
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value={this.formatDateDisplay(this.state.dateToFilter.selection.endDate)}
+                                  />
+                                  <i class="fa fa-calendar fa-fw fa-fw" onClick={this.dateOpen} ></i>
+                                </div>
+                                <div className="showcalander">
+                                  <DateRangePicker
+                                    onChange={this.handleRangeChange.bind(this, 'dateRangePicker')}
+                                    showSelectionPreview={true}
+                                    moveRangeOnFirstSelection={false}
+                                    className={'PreviewArea ' + this.state.dateClick}
+                                    months={2}
+                                    ranges={[this.state.dateRangePicker.selection]}
+                                    direction="horizontal"
+                                    // onRangeFocusChange={(value) => console.log(value)}
+                                    onPreviewChange={(value) => this.handlePreviewChange(value)}
+                                  /*staticRanges = {[]}
+                                  inputRanges = {[]}*/
+                                  />
+                                </div>
+                              </div>
+                              <div className="filters d-md-none d-sm-block d-block my-sm-0 my-2">
+                                <div className="input">
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value={this.formatDateDisplay(this.state.dateToFilter.selection.startDate)}
+                                  />
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value={this.formatDateDisplay(this.state.dateToFilter.selection.endDate, 'Continuous')}
+                                  />
+                                  <i class="fa fa-calendar fa-fw fa-fw" onClick={this.dateOpen} ></i>
+                                </div>
+                                <div className="showcalander">
+                                  <DateRange
+                                    onChange={this.handleRangeChange.bind(this, 'dateRange')}
+                                    moveRangeOnFirstSelection={false}
+                                    ranges={[this.state.dateRange.selection]}
+                                    className={'PreviewArea ' + this.state.dateClick}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="row">
+                      <div className="col-md-12">
+                        <div className="table-responsive dataTables mt-3">
+                          <DataTable className="table table-stripped table-bordered bg-light"
+                            title=""
+                            columns={columns}
+                            data={tableData}
+                            pagination
+                            paginationPerPage={25}
+                            paginationRowsPerPageOptions={[25, 50, 100]}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div> : null}
+        </div>
+      </div>
+    );
+  }
+}
+
+function mapState(state) {
+  const { alert, authentication, business } = state;
+  return { alert, authentication, business };
+
+}
+
+const actionCreators = {
+  getBusiness: businessActions.getAllBusiness,
+  getBusinessLocations: businessActions.getBusinessLocations,
+}
+
+const connectedReportPage = connect(mapState, actionCreators)(ReportPage);
+export { connectedReportPage as ReportPage };
