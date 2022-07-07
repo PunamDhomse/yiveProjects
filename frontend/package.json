@@ -22,7 +22,7 @@
     "history": "^4.6.3",
     "jquery": "^3.4.1",
     "lodash": "^4.17.15",
-    "moment": "^2.24.0",
+    "moment": "^2.29.4",
     "multiselect-dropdown-react": "^1.0.5",
     "prop-types": "^15.7.2",
     "query-string": "^6.9.0",
